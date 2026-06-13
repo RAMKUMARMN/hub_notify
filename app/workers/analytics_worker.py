@@ -5,7 +5,7 @@ session data, and computes aggregated metrics.
 Queue: analytics.events
 """
 from __future__ import annotations
-
+from app.workers.worker_base import RabbitMQWorker
 import asyncio
 import logging
 import random
@@ -23,6 +23,11 @@ def enqueue(job: Job) -> None:
 
 
 async def _process(job: Job) -> None:
+
+    print(
+        f"ANALYTICS WORKER PROCESSING: {job.job_id}"
+    )
+    
     task_type = job.payload.get("task_type", "engagement_analysis")
     event_count = job.payload.get("event_count", random.randint(500, 10000))
     job.total = event_count
@@ -66,14 +71,11 @@ async def _process(job: Job) -> None:
 
 
 async def run() -> None:
-    logger.info("analytics.events worker started")
-    while True:
-        job = await _queue.get()
-        try:
-            await _process(job)
-        except Exception as exc:
-            logger.exception("analytics_worker error for job %s", job.job_id)
-            await job_store.update(job.job_id, JobStatus.FAILED,
-                                   progress=job.progress, message=str(exc))
-        finally:
-            _queue.task_done()
+
+    worker = RabbitMQWorker(
+        queue_name="analytics.events",
+        processor=_process,
+        model=Job,
+    )
+
+    await worker.run()

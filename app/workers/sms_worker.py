@@ -5,7 +5,7 @@ Bulk SMS worker — dispatches SMS to a large list of recipients via Twilio
 Queue: notify.bulk_sms
 """
 from __future__ import annotations
-
+from app.workers.worker_base import RabbitMQWorker
 import asyncio
 import logging
 import random
@@ -23,6 +23,11 @@ def enqueue(job: Job) -> None:
 
 
 async def _process(job: Job) -> None:
+
+    print(
+        f"SMS WORKER PROCESSING: {job.job_id}"
+    )
+    
     recipients: list[str] = job.payload.get("recipients", [])
     body: str = job.payload.get("body", "CixioHub: Your notification.")
 
@@ -62,14 +67,11 @@ async def _process(job: Job) -> None:
 
 
 async def run() -> None:
-    logger.info("notify.bulk_sms worker started")
-    while True:
-        job = await _queue.get()
-        try:
-            await _process(job)
-        except Exception as exc:
-            logger.exception("sms_worker error for job %s", job.job_id)
-            await job_store.update(job.job_id, JobStatus.FAILED,
-                                   progress=job.progress, message=str(exc))
-        finally:
-            _queue.task_done()
+
+    worker = RabbitMQWorker(
+        queue_name="notify.bulk_sms",
+        processor=_process,
+        model=Job,
+    )
+
+    await worker.run()

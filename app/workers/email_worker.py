@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import random
-
+from app.workers.worker_base import RabbitMQWorker
 from app.channels.email import send_email
 from app.queue.job_store import job_store
 from app.queue.schemas import Job, JobStatus
@@ -24,6 +24,12 @@ def enqueue(job: Job) -> None:
 
 
 async def _process(job: Job) -> None:
+
+    print(
+        f"EMAIL WORKER PROCESSING: {job.job_id}"
+    )
+
+
     recipients: list[str] = job.payload.get("recipients", [])
     subject: str = job.payload.get("subject", "CixioHub Notification")
     body: str = job.payload.get("body", "Hello from CixioHub!")
@@ -69,14 +75,11 @@ async def _process(job: Job) -> None:
 
 
 async def run() -> None:
-    logger.info("notify.bulk_email worker started")
-    while True:
-        job = await _queue.get()
-        try:
-            await _process(job)
-        except Exception as exc:
-            logger.exception("email_worker error for job %s", job.job_id)
-            await job_store.update(job.job_id, JobStatus.FAILED,
-                                   progress=job.progress, message=str(exc))
-        finally:
-            _queue.task_done()
+
+    worker = RabbitMQWorker(
+        queue_name="notify.bulk_email",
+        processor=_process,
+        model=Job,
+    )
+
+    await worker.run()

@@ -44,14 +44,18 @@ QUEUE_FOR_TYPE: dict[str, str] = {
 }
 
 ALL_QUEUES = [
-    "file.uploads",
+     "file.uploads",
     "rag.bulk_ingest",
+
     "notify.bulk_email",
     "notify.bulk_sms",
+
     "analytics.events",
+
     "email.process",
     "sms.process",
     "push.process",
+
     "ai.orchestration",
     "embedding.processing",
     "memory.processing",

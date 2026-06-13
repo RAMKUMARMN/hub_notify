@@ -5,7 +5,7 @@ extracting text, chunking, embedding with Ollama, and storing in ChromaDB.
 Queue: rag.bulk_ingest
 """
 from __future__ import annotations
-
+from app.workers.worker_base import RabbitMQWorker
 import asyncio
 import logging
 import random
@@ -23,6 +23,11 @@ def enqueue(job: Job) -> None:
 
 
 async def _process(job: Job) -> None:
+
+    print(
+        f"RAG WORKER PROCESSING: {job.job_id}"
+    )
+    
     num_files = job.payload.get("num_files", random.randint(3, 20))
     job.total = num_files
 
@@ -61,14 +66,11 @@ async def _process(job: Job) -> None:
 
 
 async def run() -> None:
-    logger.info("rag.bulk_ingest worker started")
-    while True:
-        job = await _queue.get()
-        try:
-            await _process(job)
-        except Exception as exc:
-            logger.exception("rag_worker error for job %s", job.job_id)
-            await job_store.update(job.job_id, JobStatus.FAILED,
-                                   progress=job.progress, message=str(exc))
-        finally:
-            _queue.task_done()
+
+    worker = RabbitMQWorker(
+        queue_name="rag.bulk_ingest",
+        processor=_process,
+        model=Job,
+    )
+
+    await worker.run()

@@ -5,4 +5,7 @@ from app.workers import (  # noqa: F401
     file_worker,
     rag_worker,
     sms_worker,
+    ai_worker,
+    embedding_worker,
+    memory_worker,
 )

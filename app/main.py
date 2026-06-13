@@ -15,6 +15,9 @@ from app.workers import (
     file_worker,
     rag_worker,
     sms_worker,
+    ai_worker,
+    embedding_worker,
+    memory_worker,
 )
 
 @asynccontextmanager
@@ -29,7 +32,11 @@ async def lifespan(app: FastAPI):
         email_worker.run,
         sms_worker.run,
         analytics_worker.run,
+        ai_worker.run,
+        embedding_worker.run,
+        memory_worker.run,
     ]
+
     tasks = [asyncio.create_task(w()) for w in workers]
     
     yield
@@ -37,6 +44,7 @@ async def lifespan(app: FastAPI):
     # 3. Graceful shutdown
     for t in tasks:
         t.cancel()
+
     await asyncio.gather(*tasks, return_exceptions=True)
 
 

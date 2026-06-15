@@ -8,9 +8,6 @@ import uuid
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 
-from app.channels.email import send_email
-from app.channels.sms import send_sms
-from app.channels.push import send_push
 from app.queue.producer import publish
 from app.queue.schemas import NotifyPayload
 
@@ -39,32 +36,30 @@ class BulkSendRequest(BaseModel):
     recipients: list[BulkRecipient]
 
 
-@router.post("/send")
+@router.post("/send", status_code=status.HTTP_202_ACCEPTED)
 async def send_single(body: SingleSendRequest):
-    """Send a single notification immediately (no queue)."""
+    """Enqueue a single notification job. Returns job_id immediately."""
+    if body.channel not in ["email", "sms", "push", "whatsapp"]:
+        raise HTTPException(status_code=400, detail=f"Unknown channel: {body.channel}")
+
+    job_id = str(uuid.uuid4())
+    payload = NotifyPayload(
+        job_id=job_id,
+        channel=body.channel,
+        recipient=body.recipient,
+        subject=body.subject,
+        body=body.body,
+        html_body=body.html_body,
+        title=body.title,
+        data=body.data,
+    )
     try:
-        match body.channel:
-            case "email":
-                msg_id = await send_email(
-                    to=body.recipient,
-                    subject=body.subject or "",
-                    body=body.body,
-                    html_body=body.html_body,
-                )
-            case "sms":
-                msg_id = send_sms(to=body.recipient, body=body.body)
-            case "push":
-                msg_id = send_push(
-                    device_token=body.recipient,
-                    title=body.title or "CixioHub",
-                    body=body.body,
-                    data=body.data,
-                )
-            case _:
-                raise HTTPException(status_code=400, detail=f"Unknown channel: {body.channel}")
-        return {"status": "sent", "message_id": msg_id}
-    except NotImplementedError as exc:
-        raise HTTPException(status_code=501, detail=str(exc))
+        await publish(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    return {"job_id": job_id, "status": "queued"}
+
 
 
 @router.post("/bulk", status_code=status.HTTP_202_ACCEPTED)

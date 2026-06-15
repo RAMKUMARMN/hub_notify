@@ -17,6 +17,9 @@ class JobType(str, Enum):
     BULK_EMAIL = "bulk_email"
     BULK_SMS = "bulk_sms"
     ANALYTICS = "analytics"
+    AI_ORCHESTRATION = "ai_orchestration"
+    EMBEDDING_PROCESSING = "embedding_processing"
+    MEMORY_PROCESSING = "memory_processing"
 
 
 class JobStatus(str, Enum):
@@ -27,14 +30,17 @@ class JobStatus(str, Enum):
 
 
 QUEUE_FOR_TYPE: dict[str, str] = {
-    "file_upload":     "file.uploads",
-    "rag_bulk_ingest": "rag.bulk_ingest",
-    "bulk_email":      "notify.bulk_email",
-    "bulk_sms":        "notify.bulk_sms",
-    "analytics":       "analytics.events",
-    "email":           "email.process",
-    "sms":             "sms.process",
-    "push":            "push.process",
+    "file_upload":          "file.uploads",
+    "rag_bulk_ingest":      "rag.bulk_ingest",
+    "bulk_email":           "notify.bulk_email",
+    "bulk_sms":             "notify.bulk_sms",
+    "analytics":            "analytics.events",
+    "email":                "email.process",
+    "sms":                  "sms.process",
+    "push":                 "push.process",
+    "ai_orchestration":     "ai.orchestration",
+    "embedding_processing": "embedding.processing",
+    "memory_processing":    "memory.processing",
 }
 
 ALL_QUEUES = [
@@ -64,10 +70,10 @@ class Job(BaseModel):
     label: str = ""
     payload: dict = {}
     status: JobStatus = JobStatus.QUEUED
-    progress: int = 0       # 0–100
+    progress: int = 0
     message: str = ""
-    total: int = 0          # total work items
-    done_count: int = 0     # items completed so far
+    total: int = 0
+    done_count: int = 0
     created_at: str = Field(default_factory=_now)
     updated_at: str = Field(default_factory=_now)
 
@@ -78,17 +84,15 @@ class SubmitJobRequest(BaseModel):
     payload: dict = {}
 
 
-# ── Legacy payload (backward compat with existing notify router) ──────────────
-
 class NotifyPayload(BaseModel):
     """A single notification task — published to RabbitMQ as JSON."""
     job_id: str
-    channel: str            # 'email' | 'sms' | 'push' | 'whatsapp'
-    recipient: str          # email address, phone number, or FCM token
+    channel: str
+    recipient: str
     subject: str | None = None
     body: str = ""
     html_body: str | None = None
-    title: str | None = None    # for push notifications
-    data: dict | None = None    # for push notification data payload
+    title: str | None = None
+    data: dict | None = None
     attempt: int = 1
     max_attempts: int = 4

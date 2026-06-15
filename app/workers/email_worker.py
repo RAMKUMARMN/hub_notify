@@ -24,7 +24,7 @@ def enqueue(job: Job) -> None:
 
 
 async def _process(job: Job) -> None:
-
+    
     print(
         f"EMAIL WORKER PROCESSING: {job.job_id}"
     )
@@ -83,3 +83,5 @@ async def run() -> None:
     )
 
     await worker.run()
+
+    

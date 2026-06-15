@@ -1,29 +1,37 @@
-
 import json
 import aio_pika
 
-from app.queue.dlq_handler import (
-    move_to_dlq
-)
-
-MAX_RETRIES = 3
+from app.queue.dlq_handler import move_to_dlq
+from app.queue.job_store import job_store
+from app.queue.schemas import JobStatus
 
 
 async def handle_retry(
     channel,
     queue_name,
-    message_data
+    message_data,
 ):
 
-    current_retry = message_data.get(
-        "retry_count",
-        0
+    current_attempt = message_data.get(
+        "attempt",
+        1
     )
 
-    if current_retry < MAX_RETRIES:
+    max_attempts = message_data.get(
+        "max_attempts",
+        4
+    )
 
-        message_data["retry_count"] = (
-            current_retry + 1
+    if current_attempt < max_attempts:
+
+        await job_store.update(
+            message_data["job_id"],
+            JobStatus.RETRYING,
+            message=f"Retry attempt {current_attempt + 1}"
+        )
+
+        message_data["attempt"] = (
+            current_attempt + 1
         )
 
         retry_queue = (
@@ -40,14 +48,20 @@ async def handle_retry(
         )
 
         print(
-            f"Retry {current_retry + 1} "
+            f"Retry attempt {current_attempt + 1} "
             f"sent to {retry_queue}"
         )
 
     else:
 
+        await job_store.update(
+            message_data["job_id"],
+            JobStatus.DLQ,
+            message="Moved to Dead Letter Queue"
+        )
+
         print(
-            f"Max retries reached for "
+            f"Max attempts reached for "
             f"{queue_name}"
         )
 

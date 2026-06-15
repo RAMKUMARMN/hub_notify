@@ -27,6 +27,8 @@ class JobStatus(str, Enum):
     PROCESSING = "processing"
     DONE = "done"
     FAILED = "failed"
+    RETRYING = "retrying"
+    DLQ = "dlq"
 
 
 QUEUE_FOR_TYPE: dict[str, str] = {
@@ -67,6 +69,8 @@ class Job(BaseModel):
     job_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     job_type: JobType
     queue: str
+    attempt: int = 1
+    max_attempts: int = 4
     label: str = ""
     payload: dict = {}
     status: JobStatus = JobStatus.QUEUED

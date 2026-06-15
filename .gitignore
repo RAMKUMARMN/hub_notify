@@ -22,3 +22,7 @@ htmlcov/
 
 # macOS
 .DS_Store
+
+# Local task tracking
+tasks.md
+

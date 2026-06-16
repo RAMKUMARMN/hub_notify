@@ -8,6 +8,10 @@ logger = logging.getLogger(__name__)
 
 async def _process(job: Job) -> None:
 
+    raise Exception(
+        "Forced Failure"
+    )
+
     print(
         f"AI WORKER PROCESSING: {job.job_id}"
     )
@@ -16,6 +20,10 @@ async def _process(job: Job) -> None:
         "Processing AI orchestration job %s",
         job.job_id,
     )
+
+   
+
+    
 
     # Future AI orchestration logic
     # Route requests to AI models

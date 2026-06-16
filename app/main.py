@@ -27,15 +27,19 @@ async def lifespan(app: FastAPI):
     
     # 2. Start all queue workers as background tasks
     workers = [
-        file_worker.run,
-        rag_worker.run,
-        email_worker.run,
-        sms_worker.run,
-        analytics_worker.run,
-        ai_worker.run,
-        embedding_worker.run,
-        memory_worker.run,
-    ]
+
+    file_worker.run,
+    rag_worker.run,
+    email_worker.run,
+    sms_worker.run,
+    analytics_worker.run,
+    ai_worker.run,
+    embedding_worker.run,
+    memory_worker.run,
+
+    
+
+]
 
     tasks = [asyncio.create_task(w()) for w in workers]
     

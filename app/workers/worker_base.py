@@ -1,7 +1,7 @@
 import json
 import logging
 from typing import Callable, Type
-
+from app.queue.retry_handler import handle_retry
 import aio_pika
 
 from app.config import settings
@@ -51,7 +51,11 @@ class RabbitMQWorker:
                     self.queue_name,
                 )
 
-                
+                print(
+                    f"PROCESSING "
+                    f"retry_count="
+                    f"{payload_dict.get('retry_count', 0)}"
+                )
 
                 await self.processor(payload)
 
@@ -59,17 +63,17 @@ class RabbitMQWorker:
 
             except Exception as exc:
 
-                print("\nERROR OCCURRED:")
-                print(type(exc).__name__)
-                print(exc)
-
                 logger.exception(
                     "Error processing message from %s: %s",
                     self.queue_name,
                     exc,
                 )
 
-                raise
+                await handle_retry(
+                    channel=self.channel,
+                    queue_name=self.queue_name,
+                    message_data=payload_dict,
+                )
 
     async def run(self) -> None:
 
@@ -82,23 +86,21 @@ class RabbitMQWorker:
         )
 
         channel = await connection.channel()
+        self.channel = channel
 
         await channel.set_qos(
             prefetch_count=10
         )
 
-        queue = await channel.declare_queue(
+     
+
+        main_queue = await channel.declare_queue(
             self.queue_name,
             durable=True,
         )
 
-        await queue.consume(
+        await main_queue.consume(
             self.process_message
         )
 
-        print(
-            f"LISTENING ON QUEUE: {self.queue_name}"
-        )
-
-        import asyncio
-        await asyncio.Future()
+        

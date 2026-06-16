@@ -19,19 +19,45 @@ async def declare_retry_dlq_queues(channel):
         dlq_queue = f"{queue}.dlq"
 
         await channel.declare_queue(
-            retry_queue,
-            durable=True
+            f"{queue}.retry.1",
+            durable=True,
+            arguments={
+                "x-message-ttl": 60000,
+                "x-dead-letter-exchange": "",
+                "x-dead-letter-routing-key": queue,
+            },
         )
 
         await channel.declare_queue(
-            dlq_queue,
-            durable=True
+            f"{queue}.retry.2",
+            durable=True,
+            arguments={
+                "x-message-ttl": 300000,
+                "x-dead-letter-exchange": "",
+                "x-dead-letter-routing-key": queue,
+            },
         )
 
-        print(f"Created: {retry_queue}")
-        print(f"Created: {dlq_queue}")
+        await channel.declare_queue(
+            f"{queue}.retry.3",
+            durable=True,
+            arguments={
+                "x-message-ttl": 1800000,
+                "x-dead-letter-exchange": "",
+                "x-dead-letter-routing-key": queue,
+            },
+        )
 
-    print("All Retry and DLQ queues declared")
+        await channel.declare_queue(
+            f"{queue}.dlq",
+            durable=True,
+        )
+
+        print(f"Created: {queue}.retry.1")
+        print(f"Created: {queue}.retry.2")
+        print(f"Created: {queue}.retry.3")
+        print(f"Created: {queue}.dlq")
+        print("All Retry and DLQ queues declared")
 
 
 async def setup():

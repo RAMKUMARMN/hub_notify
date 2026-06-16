@@ -1,4 +1,3 @@
-
 import json
 import aio_pika
 
@@ -22,34 +21,46 @@ async def handle_retry(
 
     if current_retry < MAX_RETRIES:
 
+        next_retry = current_retry + 1
+
         message_data["retry_count"] = (
-            current_retry + 1
+            next_retry
         )
 
-        retry_queue = (
-            f"{queue_name}.retry"
+        retry_queue = {
+            1: f"{queue_name}.retry.1",
+            2: f"{queue_name}.retry.2",
+            3: f"{queue_name}.retry.3",
+        }[next_retry]
+
+        print(
+            f"Publishing retry "
+            f"{next_retry}"
         )
 
         await channel.default_exchange.publish(
             aio_pika.Message(
                 body=json.dumps(
                     message_data
-                ).encode()
+                ).encode(),
+                delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
             ),
             routing_key=retry_queue
         )
 
         print(
-            f"Retry {current_retry + 1} "
+            f"Retry {next_retry} "
             f"sent to {retry_queue}"
         )
 
     else:
 
         print(
-            f"Max retries reached for "
-            f"{queue_name}"
+            f"Max retries reached "
+            f"for {queue_name}"
         )
+
+        
 
         await move_to_dlq(
             channel,

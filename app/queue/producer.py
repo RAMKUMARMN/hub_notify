@@ -18,16 +18,32 @@ QUEUE_NAMES = {
 }
 
 
-async def publish(payload: NotifyPayload) -> None:
+async def publish(payload: NotifyPayload, routing_key: str | None = None) -> None:
     """Publish a single notification task to the appropriate RabbitMQ queue."""
-    queue_name = QUEUE_NAMES.get(payload.channel)
+    queue_name = routing_key or QUEUE_NAMES.get(payload.channel)
     if not queue_name:
         raise ValueError(f"Unknown channel: {payload.channel}")
 
     connection = await aio_pika.connect_robust(settings.rabbitmq_url)
     async with connection:
         channel = await connection.channel()
-        queue = await channel.declare_queue(queue_name, durable=True)
+        
+        arguments = None
+        if ".retry." in queue_name:
+            parts = queue_name.split(".")
+            try:
+                delay_str = parts[-1].replace("s", "")
+                delay_sec = int(delay_str)
+                base_channel = parts[0]
+                arguments = {
+                    "x-dead-letter-exchange": "",
+                    "x-dead-letter-routing-key": f"{base_channel}.process",
+                    "x-message-ttl": delay_sec * 1000,
+                }
+            except Exception:
+                pass
+
+        queue = await channel.declare_queue(queue_name, durable=True, arguments=arguments)
         await channel.default_exchange.publish(
             aio_pika.Message(
                 body=payload.model_dump_json().encode(),

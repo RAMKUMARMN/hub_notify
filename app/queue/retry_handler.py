@@ -1,69 +1,66 @@
 import json
 import aio_pika
 
-from app.queue.dlq_handler import move_to_dlq
-from app.queue.job_store import job_store
-from app.queue.schemas import JobStatus
+from app.queue.dlq_handler import (
+    move_to_dlq
+)
+
+MAX_RETRIES = 3
 
 
 async def handle_retry(
     channel,
     queue_name,
-    message_data,
+    message_data
 ):
 
-    current_attempt = message_data.get(
-        "attempt",
-        1
+    current_retry = message_data.get(
+        "retry_count",
+        0
     )
 
-    max_attempts = message_data.get(
-        "max_attempts",
-        4
-    )
+    if current_retry < MAX_RETRIES:
 
-    if current_attempt < max_attempts:
+        next_retry = current_retry + 1
 
-        await job_store.update(
-            message_data["job_id"],
-            JobStatus.RETRYING,
-            message=f"Retry attempt {current_attempt + 1}"
+        message_data["retry_count"] = (
+            next_retry
         )
 
-        message_data["attempt"] = (
-            current_attempt + 1
-        )
+        retry_queue = {
+            1: f"{queue_name}.retry.1",
+            2: f"{queue_name}.retry.2",
+            3: f"{queue_name}.retry.3",
+        }[next_retry]
 
-        retry_queue = (
-            f"{queue_name}.retry"
+        print(
+            f"Publishing retry "
+            f"{next_retry}"
         )
 
         await channel.default_exchange.publish(
             aio_pika.Message(
                 body=json.dumps(
                     message_data
-                ).encode()
+                ).encode(),
+                delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
             ),
             routing_key=retry_queue
         )
 
         print(
-            f"Retry attempt {current_attempt + 1} "
+            f"Retry {next_retry} "
             f"sent to {retry_queue}"
         )
 
     else:
 
-        await job_store.update(
-            message_data["job_id"],
-            JobStatus.DLQ,
-            message="Moved to Dead Letter Queue"
+        print(
+            f"Max retries reached "
+            f"for {queue_name}"
         )
 
-        print(
-            f"Max attempts reached for "
-            f"{queue_name}"
-        )
+        
 
         await move_to_dlq(
             channel,

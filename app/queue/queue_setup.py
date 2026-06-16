@@ -5,11 +5,10 @@ for all registered queues.
 
 import asyncio
 import aio_pika
-import logging
+
 from app.config import settings
 from app.queue.queue_names import ALL_QUEUES
 
-logger = logging.getLogger(__name__)
 
 async def declare_retry_dlq_queues(channel):
     print("declare_retry_dlq_queues() called")
@@ -20,18 +19,45 @@ async def declare_retry_dlq_queues(channel):
         dlq_queue = f"{queue}.dlq"
 
         await channel.declare_queue(
-            retry_queue,
-            durable=True
+            f"{queue}.retry.1",
+            durable=True,
+            arguments={
+                "x-message-ttl": 60000,
+                "x-dead-letter-exchange": "",
+                "x-dead-letter-routing-key": queue,
+            },
         )
 
         await channel.declare_queue(
-            dlq_queue,
-            durable=True
+            f"{queue}.retry.2",
+            durable=True,
+            arguments={
+                "x-message-ttl": 300000,
+                "x-dead-letter-exchange": "",
+                "x-dead-letter-routing-key": queue,
+            },
         )
 
-        logger.info(f"Created: {retry_queue}")
-        logger.info(f"Created: {dlq_queue}")
-    logger.info("All Retry and DLQ queues declared")
+        await channel.declare_queue(
+            f"{queue}.retry.3",
+            durable=True,
+            arguments={
+                "x-message-ttl": 1800000,
+                "x-dead-letter-exchange": "",
+                "x-dead-letter-routing-key": queue,
+            },
+        )
+
+        await channel.declare_queue(
+            f"{queue}.dlq",
+            durable=True,
+        )
+
+        print(f"Created: {queue}.retry.1")
+        print(f"Created: {queue}.retry.2")
+        print(f"Created: {queue}.retry.3")
+        print(f"Created: {queue}.dlq")
+        print("All Retry and DLQ queues declared")
 
 
 async def setup():

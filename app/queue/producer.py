@@ -14,7 +14,17 @@ QUEUE_NAMES = {
     "email": "email.process",
     "sms": "sms.process",
     "push": "push.process",
-    "whatsapp": "push.process",  # shares push queue for now
+    "whatsapp": "push.process",
+      "notify.bulk_email": "notify.bulk_email",
+        "ai_orchestration":"ai_orchestration",
+          "analytics.events":"analytics.events" ,
+           "embedding_process":"embedding_process",
+            "file_uploads":"file_uploads",
+             "memory.processing": "memory.processing"  ,
+             "notify.bulk_sms": "notify.bulk_sms",
+             "rag.bulk_ingest": "rag.bulk_ingest" ,
+               # shares push queue for now
+             # shares push queue for now
 }
 
 

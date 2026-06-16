@@ -1,27 +1,44 @@
 """
 SMS channel — sends via Twilio.
-
-Students: implement send_sms() using the Twilio Python SDK.
 """
+
+import logging
+
+from twilio.rest import Client
+
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 def send_sms(to: str, body: str) -> str:
     """
     Send an SMS via Twilio.
 
-    Returns the Twilio message SID on success.
+    Args:
+        to: Recipient phone number in E.164 format.
+        body: SMS message content.
 
-    TODO:
-      from twilio.rest import Client
-      client = Client(settings.twilio_account_sid, settings.twilio_auth_token)
-      message = client.messages.create(
-          body=body,
-          from_=settings.twilio_phone_number,
-          to=to,
-      )
-      return message.sid
+    Returns:
+        Twilio Message SID.
+
+    Raises:
+        Exception: Any Twilio or network-related exception.
     """
-    raise NotImplementedError(
-        "Install twilio and implement send_sms() in app/channels/sms.py"
+
+    logger.info("Sending SMS to %s", to)
+
+    client = Client(
+        settings.twilio_account_sid,
+        settings.twilio_auth_token,
     )
+
+    message = client.messages.create(
+        body=body,
+        from_=settings.twilio_phone_number,
+        to=to,
+    )
+
+    logger.info("SMS sent successfully. SID=%s", message.sid)
+
+    return message.sid

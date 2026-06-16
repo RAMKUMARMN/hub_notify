@@ -1,8 +1,10 @@
 import asyncio
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+
+from app.database import get_db
 
 from app.routers.notify import router as notify_router
 from app.routers.jobs import router as jobs_router
@@ -17,6 +19,12 @@ from app.workers import (
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Initialize database tables
+    from app.database import engine, Base
+    from app.models import NotificationJob, IndividualNotification  # noqa: F401 (Registers models with Base)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
     # Start all queue workers as background tasks
     workers = [
         file_worker.run,
@@ -30,6 +38,8 @@ async def lifespan(app: FastAPI):
     for t in tasks:
         t.cancel()
     await asyncio.gather(*tasks, return_exceptions=True)
+    # Dispose of engine connection pool
+    await engine.dispose()
 
 
 app = FastAPI(
@@ -52,6 +62,16 @@ app.include_router(jobs_router, prefix="/api/v1")
 
 
 @app.get("/api/v1/health", tags=["health"])
-async def health():
-    return {"status": "ok", "service": "cixiohub-notify"}
+async def health(db=Depends(get_db)):
+    from sqlalchemy import text
+    try:
+        await db.execute(text("SELECT 1"))
+        db_status = "connected"
+    except Exception as e:
+        db_status = f"error: {e}"
+    return {
+        "status": "ok",
+        "service": "cixiohub-notify",
+        "database": db_status,
+    }
 

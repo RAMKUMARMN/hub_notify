@@ -19,6 +19,9 @@ from app.config import settings
 from app.queue.producer import publish
 from app.queue.schemas import NotifyPayload
 
+from app.database import async_session
+from app.models import NotificationJob, IndividualNotification
+
 logger = logging.getLogger(__name__)
 
 RETRY_DELAYS = {1: 0, 2: 60, 3: 300, 4: 1800}  # seconds before retry
@@ -55,17 +58,85 @@ async def process_message(message: aio_pika.IncomingMessage) -> None:
         try:
             await dispatch(payload)
             logger.info("Sent %s to %s (job %s)", payload.channel, payload.recipient, payload.job_id)
-            # TODO: update notification_jobs table — increment sent count
+            
+            # Update database
+            async with async_session() as db:
+                # 1. Update main job metrics
+                job = await db.get(NotificationJob, payload.job_id)
+                if job:
+                    job.sent += 1
+                    if payload.attempt > 1 and job.retrying > 0:
+                        job.retrying -= 1
+                    if job.sent + job.failed >= job.total:
+                        job.completed = True
+                
+                # 2. Update individual notification status
+                from sqlalchemy import select
+                result = await db.execute(
+                    select(IndividualNotification)
+                    .where(IndividualNotification.job_id == payload.job_id)
+                    .where(IndividualNotification.recipient == payload.recipient)
+                )
+                ind = result.scalars().first()
+                if ind:
+                    ind.status = "sent"
+                    ind.attempt = payload.attempt
+                
+                await db.commit()
         except Exception as exc:
             logger.warning("Failed attempt %d for job %s: %s", payload.attempt, payload.job_id, exc)
             if payload.attempt < payload.max_attempts:
+                # Update database for retry
+                async with async_session() as db:
+                    # 1. Update main job retry metric
+                    job = await db.get(NotificationJob, payload.job_id)
+                    if job:
+                        job.retrying += 1
+                    
+                    # 2. Update individual notification status
+                    from sqlalchemy import select
+                    result = await db.execute(
+                        select(IndividualNotification)
+                        .where(IndividualNotification.job_id == payload.job_id)
+                        .where(IndividualNotification.recipient == payload.recipient)
+                    )
+                    ind = result.scalars().first()
+                    if ind:
+                        ind.status = "retrying"
+                        ind.attempt = payload.attempt
+                    
+                    await db.commit()
+
                 # Re-enqueue with incremented attempt count
                 # TODO: add delay (publish after RETRY_DELAYS[payload.attempt] seconds)
                 payload.attempt += 1
                 await publish(payload)
             else:
                 logger.error("Permanently failed job %s channel %s", payload.job_id, payload.channel)
-                # TODO: update notification_jobs table — increment failed count
+                # Update database for permanent failure
+                async with async_session() as db:
+                    # 1. Update main job metrics
+                    job = await db.get(NotificationJob, payload.job_id)
+                    if job:
+                        job.failed += 1
+                        if payload.attempt > 1 and job.retrying > 0:
+                            job.retrying -= 1
+                        if job.sent + job.failed >= job.total:
+                            job.completed = True
+                    
+                    # 2. Update individual notification status
+                    from sqlalchemy import select
+                    result = await db.execute(
+                        select(IndividualNotification)
+                        .where(IndividualNotification.job_id == payload.job_id)
+                        .where(IndividualNotification.recipient == payload.recipient)
+                    )
+                    ind = result.scalars().first()
+                    if ind:
+                        ind.status = "failed"
+                        ind.attempt = payload.attempt
+                    
+                    await db.commit()
                 # TODO: publish to *.failed queue for investigation
 
 

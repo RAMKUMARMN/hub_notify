@@ -9,6 +9,8 @@ from app.queue.utils import setup_queues
 
 from app.routers.notify import router as notify_router
 from app.routers.jobs import router as jobs_router
+from app.routers.files import router as files_router
+
 from app.workers import (
     analytics_worker,
     email_worker,
@@ -69,6 +71,8 @@ app.add_middleware(
 
 app.include_router(notify_router, prefix="/api/v1")
 app.include_router(jobs_router, prefix="/api/v1")
+app.include_router(files_router, prefix="/api/v1")
+
 
 
 @app.get("/api/v1/health", tags=["health"])

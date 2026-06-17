@@ -14,7 +14,7 @@ class NotificationJob(Base):
     sent: Mapped[int] = mapped_column(Integer, default=0)
     failed: Mapped[int] = mapped_column(Integer, default=0)
     retrying: Mapped[int] = mapped_column(Integer, default=0)
-    completed: Mapped[bool] = mapped_column(Boolean, default=False)
+    completed: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
@@ -27,4 +27,5 @@ class NotificationJob(Base):
     scheduled_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
+        index=True,
     )

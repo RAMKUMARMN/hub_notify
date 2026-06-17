@@ -64,32 +64,40 @@ async def send_single(body: SingleSendRequest, db: AsyncSession = Depends(get_db
     )
     db.add(job)
 
+    # Determine status based on whether it is scheduled
+    status_val = "scheduled" if body.scheduled_at else "queued"
+
+    notif_id = str(uuid.uuid4())
+
     # Create IndividualNotification record in DB
     ind_notification = IndividualNotification(
+        id=notif_id,
         job_id=job_id,
         recipient=body.recipient,
-        status="queued",
+        status=status_val,
         attempt=1,
     )
     db.add(ind_notification)
     await db.commit()
 
-    payload = NotifyPayload(
-        job_id=job_id,
-        channel=body.channel,
-        recipient=body.recipient,
-        subject=body.subject,
-        body=body.body,
-        html_body=body.html_body,
-        title=body.title,
-        data=body.data,
-    )
-    try:
-        await publish(payload)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+    if not body.scheduled_at:
+        payload = NotifyPayload(
+            notification_id=notif_id,
+            job_id=job_id,
+            channel=body.channel,
+            recipient=body.recipient,
+            subject=body.subject,
+            body=body.body,
+            html_body=body.html_body,
+            title=body.title,
+            data=body.data,
+        )
+        try:
+            await publish(payload)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
 
-    return {"job_id": job_id, "status": "queued"}
+    return {"job_id": job_id, "status": status_val}
 
 
 
@@ -114,29 +122,38 @@ async def send_bulk(body: BulkSendRequest, db: AsyncSession = Depends(get_db)):
     )
     db.add(job)
 
+    # Determine status based on whether it is scheduled
+    status_val = "scheduled" if body.scheduled_at else "queued"
+
     # Create IndividualNotification records in DB
+    notifications_data = []
     for r in body.recipients:
+        notif_id = str(uuid.uuid4())
         ind_notification = IndividualNotification(
+            id=notif_id,
             job_id=job_id,
             recipient=r.recipient,
-            status="queued",
+            status=status_val,
             attempt=1,
         )
         db.add(ind_notification)
+        notifications_data.append((r, notif_id))
     await db.commit()
 
-    for r in body.recipients:
-        payload = NotifyPayload(
-            job_id=job_id,
-            channel=body.channel,
-            recipient=r.recipient,
-            subject=r.subject,
-            body=r.body,
-            html_body=r.html_body,
-        )
-        await publish(payload)
+    if not body.scheduled_at:
+        for r, notif_id in notifications_data:
+            payload = NotifyPayload(
+                notification_id=notif_id,
+                job_id=job_id,
+                channel=body.channel,
+                recipient=r.recipient,
+                subject=r.subject,
+                body=r.body,
+                html_body=r.html_body,
+            )
+            await publish(payload)
 
-    return {"job_id": job_id, "total": len(body.recipients), "status": "queued"}
+    return {"job_id": job_id, "total": len(body.recipients), "status": status_val}
 
 
 @router.get("/jobs/{job_id}")

@@ -18,9 +18,10 @@ class IndividualNotification(Base):
         String, 
         ForeignKey("notification_jobs.job_id", ondelete="CASCADE"), 
         nullable=False,
+        index=True,
     )
     recipient: Mapped[str] = mapped_column(String, nullable=False)
-    status: Mapped[str] = mapped_column(String, default="queued")
+    status: Mapped[str] = mapped_column(String, default="queued", index=True)
     attempt: Mapped[int] = mapped_column(Integer, default=1)
     
     created_at: Mapped[datetime] = mapped_column(

@@ -67,26 +67,39 @@ async def process_message(message: aio_pika.IncomingMessage) -> None:
             
             # Update database
             async with async_session() as db:
-                # 1. Update individual notification status first to check was_retrying status
-                from sqlalchemy import select
-                result = await db.execute(
-                    select(IndividualNotification)
-                    .where(IndividualNotification.job_id == payload.job_id)
-                    .where(IndividualNotification.recipient == payload.recipient)
-                )
+                from sqlalchemy import select, func
+                
+                # 1. Update individual notification status
+                if payload.notification_id:
+                    result = await db.execute(
+                        select(IndividualNotification)
+                        .where(IndividualNotification.id == payload.notification_id)
+                    )
+                else:
+                    result = await db.execute(
+                        select(IndividualNotification)
+                        .where(IndividualNotification.job_id == payload.job_id)
+                        .where(IndividualNotification.recipient == payload.recipient)
+                    )
                 ind = result.scalars().first()
-                was_retrying = False
                 if ind:
-                    was_retrying = (ind.status == "retrying")
                     ind.status = "sent"
                     ind.attempt = payload.attempt
+                    await db.flush()
                 
-                # 2. Update main job metrics
+                # 2. Update main job metrics based on current counts
+                counts_res = await db.execute(
+                    select(IndividualNotification.status, func.count(IndividualNotification.id))
+                    .where(IndividualNotification.job_id == payload.job_id)
+                    .group_by(IndividualNotification.status)
+                )
+                counts = dict(counts_res.all())
+                
                 job = await db.get(NotificationJob, payload.job_id)
                 if job:
-                    job.sent += 1
-                    if was_retrying and job.retrying > 0:
-                        job.retrying -= 1
+                    job.sent = counts.get("sent", 0)
+                    job.failed = counts.get("failed", 0)
+                    job.retrying = counts.get("retrying", 0)
                     if job.sent + job.failed >= job.total:
                         job.completed = True
                 
@@ -95,34 +108,45 @@ async def process_message(message: aio_pika.IncomingMessage) -> None:
             logger.warning("Failed attempt %d for job %s: %s", payload.attempt, payload.job_id, exc)
             if payload.attempt < payload.max_attempts:
                 # Determine retry delay queue
-                # 2nd attempt -> 60s
-                # 3rd attempt -> 300s
-                # 4th attempt -> 1800s
                 next_attempt = payload.attempt + 1
                 delay_sec = {2: 60, 3: 300, 4: 1800}.get(next_attempt, 60)
                 retry_q_name = f"{base_channel}.retry.{delay_sec}s"
 
                 # Update database for retry
                 async with async_session() as db:
-                    # 1. Update individual notification status first to check already_retrying status
-                    from sqlalchemy import select
-                    result = await db.execute(
-                        select(IndividualNotification)
-                        .where(IndividualNotification.job_id == payload.job_id)
-                        .where(IndividualNotification.recipient == payload.recipient)
-                    )
+                    from sqlalchemy import select, func
+                    
+                    # 1. Update individual notification status
+                    if payload.notification_id:
+                        result = await db.execute(
+                            select(IndividualNotification)
+                            .where(IndividualNotification.id == payload.notification_id)
+                        )
+                    else:
+                        result = await db.execute(
+                            select(IndividualNotification)
+                            .where(IndividualNotification.job_id == payload.job_id)
+                            .where(IndividualNotification.recipient == payload.recipient)
+                        )
                     ind = result.scalars().first()
-                    already_retrying = False
                     if ind:
-                        already_retrying = (ind.status == "retrying")
                         ind.status = "retrying"
                         ind.attempt = payload.attempt
+                        await db.flush()
                     
-                    # 2. Update main job retry metric
+                    # 2. Update main job metrics based on current counts
+                    counts_res = await db.execute(
+                        select(IndividualNotification.status, func.count(IndividualNotification.id))
+                        .where(IndividualNotification.job_id == payload.job_id)
+                        .group_by(IndividualNotification.status)
+                    )
+                    counts = dict(counts_res.all())
+                    
                     job = await db.get(NotificationJob, payload.job_id)
                     if job:
-                        if not already_retrying:
-                            job.retrying += 1
+                        job.sent = counts.get("sent", 0)
+                        job.failed = counts.get("failed", 0)
+                        job.retrying = counts.get("retrying", 0)
                     
                     await db.commit()
 
@@ -134,26 +158,39 @@ async def process_message(message: aio_pika.IncomingMessage) -> None:
                 logger.error("Permanently failed job %s channel %s", payload.job_id, payload.channel)
                 # Update database for permanent failure (5th try / failed queue)
                 async with async_session() as db:
-                    # 1. Update individual notification status first to check was_retrying status
-                    from sqlalchemy import select
-                    result = await db.execute(
-                        select(IndividualNotification)
-                        .where(IndividualNotification.job_id == payload.job_id)
-                        .where(IndividualNotification.recipient == payload.recipient)
-                    )
+                    from sqlalchemy import select, func
+                    
+                    # 1. Update individual notification status
+                    if payload.notification_id:
+                        result = await db.execute(
+                            select(IndividualNotification)
+                            .where(IndividualNotification.id == payload.notification_id)
+                        )
+                    else:
+                        result = await db.execute(
+                            select(IndividualNotification)
+                            .where(IndividualNotification.job_id == payload.job_id)
+                            .where(IndividualNotification.recipient == payload.recipient)
+                        )
                     ind = result.scalars().first()
-                    was_retrying = False
                     if ind:
-                        was_retrying = (ind.status == "retrying")
                         ind.status = "failed"
                         ind.attempt = payload.attempt + 1
+                        await db.flush()
                     
-                    # 2. Update main job metrics
+                    # 2. Update main job metrics based on current counts
+                    counts_res = await db.execute(
+                        select(IndividualNotification.status, func.count(IndividualNotification.id))
+                        .where(IndividualNotification.job_id == payload.job_id)
+                        .group_by(IndividualNotification.status)
+                    )
+                    counts = dict(counts_res.all())
+                    
                     job = await db.get(NotificationJob, payload.job_id)
                     if job:
-                        job.failed += 1
-                        if was_retrying and job.retrying > 0:
-                            job.retrying -= 1
+                        job.sent = counts.get("sent", 0)
+                        job.failed = counts.get("failed", 0)
+                        job.retrying = counts.get("retrying", 0)
                         if job.sent + job.failed >= job.total:
                             job.completed = True
                     

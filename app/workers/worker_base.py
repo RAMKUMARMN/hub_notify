@@ -3,10 +3,13 @@ import logging
 from typing import Callable, Type
 from app.queue.retry_handler import handle_retry
 import aio_pika
-
+import asyncio
 from app.config import settings
 
+
 logger = logging.getLogger(__name__)
+
+
 
 
 class RabbitMQWorker:
@@ -81,26 +84,49 @@ class RabbitMQWorker:
             f"WORKER BASE STARTING: {self.queue_name}"
         )
 
-        connection = await aio_pika.connect_robust(
+        print(
+            "CONNECTING TO:",
             settings.rabbitmq_url
         )
 
+        try:
+            connection = await aio_pika.connect_robust(
+                settings.rabbitmq_url
+            )
+
+            print(
+                "CONNECTED SUCCESSFULLY"
+            )
+
+        except Exception as e:
+
+            print(
+                "RABBITMQ ERROR:",
+                e
+            )
+
+            raise
+
         channel = await connection.channel()
-        self.channel = channel
-
-        await channel.set_qos(
-            prefetch_count=10
-        )
-
      
 
         main_queue = await channel.declare_queue(
             self.queue_name,
             durable=True,
         )
+        print(
+            f"DECLARED QUEUE: {self.queue_name}"
+        )
+
 
         await main_queue.consume(
             self.process_message
         )
+
+        print(
+            f"LISTENING ON QUEUE: {self.queue_name}"
+        )
+
+        await asyncio.Future()
 
         

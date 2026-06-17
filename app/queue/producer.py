@@ -1,47 +1,127 @@
 """
-RabbitMQ producer — publishes notification tasks from the backend API.
+RabbitMQ producer — publishes notification tasks
+and generic jobs to RabbitMQ.
 
-Called by the backend (admin bulk create, notification endpoints) to enqueue tasks.
+Called by backend APIs and internal services
+to enqueue work.
 """
-import json
+
+import logging
 
 import aio_pika
 
 from app.config import settings
-from app.queue.schemas import NotifyPayload
+from app.queue.schemas import (
+    NotifyPayload,
+    Job,
+)
+
+logger = logging.getLogger(__name__)
+
 
 QUEUE_NAMES = {
+    # Notification queues
     "email": "email.process",
     "sms": "sms.process",
     "push": "push.process",
     "whatsapp": "push.process",
-      "notify.bulk_email": "notify.bulk_email",
-        "ai_orchestration":"ai_orchestration",
-          "analytics.events":"analytics.events" ,
-           "embedding_process":"embedding_process",
-            "file_uploads":"file_uploads",
-             "memory.processing": "memory.processing"  ,
-             "notify.bulk_sms": "notify.bulk_sms",
-             "rag.bulk_ingest": "rag.bulk_ingest" ,
-               # shares push queue for now
-             # shares push queue for now
+
+    # Bulk notifications
+    "notify.bulk_email": "notify.bulk_email",
+    "notify.bulk_sms": "notify.bulk_sms",
+
+    # AI / RAG queues
+    "ai.orchestration": "ai.orchestration",
+    "analytics.events": "analytics.events",
+    "embedding.processing": "embedding.processing",
+    "file.uploads": "file.uploads",
+    "memory.processing": "memory.processing",
+    "rag.bulk_ingest": "rag.bulk_ingest",
 }
 
 
-async def publish(payload: NotifyPayload) -> None:
-    """Publish a single notification task to the appropriate RabbitMQ queue."""
-    queue_name = QUEUE_NAMES.get(payload.channel)
-    if not queue_name:
-        raise ValueError(f"Unknown channel: {payload.channel}")
+async def publish(
+    payload: NotifyPayload,
+) -> None:
+    """
+    Publish a notification task
+    to the appropriate RabbitMQ queue.
+    """
 
-    connection = await aio_pika.connect_robust(settings.rabbitmq_url)
+    queue_name = QUEUE_NAMES.get(
+        payload.channel
+    )
+
+    if not queue_name:
+        raise ValueError(
+            f"Unknown channel: {payload.channel}"
+        )
+
+    connection = await aio_pika.connect_robust(
+        settings.rabbitmq_url
+    )
+
     async with connection:
+
         channel = await connection.channel()
-        queue = await channel.declare_queue(queue_name, durable=True)
+
+        queue = await channel.declare_queue(
+            queue_name,
+            durable=True,
+        )
+
         await channel.default_exchange.publish(
             aio_pika.Message(
                 body=payload.model_dump_json().encode(),
                 delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
             ),
             routing_key=queue.name,
+        )
+
+        logger.info(
+            "Published notification to %s",
+            queue.name,
+        )
+
+
+async def publish_job(
+    job: Job,
+) -> None:
+    """
+    Publish a generic Job message.
+
+    Used for:
+    - RAG ingestion
+    - AI orchestration
+    - Embedding processing
+    - Memory processing
+    - Analytics events
+    - File uploads
+    """
+
+    connection = await aio_pika.connect_robust(
+        settings.rabbitmq_url
+    )
+
+    async with connection:
+
+        channel = await connection.channel()
+
+        queue = await channel.declare_queue(
+            job.queue,
+            durable=True,
+        )
+
+        await channel.default_exchange.publish(
+            aio_pika.Message(
+                body=job.model_dump_json().encode(),
+                delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
+            ),
+            routing_key=queue.name,
+        )
+
+        logger.info(
+            "Published job %s to %s",
+            job.job_id,
+            queue.name,
         )

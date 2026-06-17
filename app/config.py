@@ -33,5 +33,8 @@ class Settings(BaseSettings):
     aws_region: str = "ap-south-1"
     sns_platform_arn_ios: str = ""
 
+    # AI Service
+    ai_service_url: str = "http://localhost:8003"
+
 
 settings = Settings()

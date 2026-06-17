@@ -5,8 +5,12 @@ Handles single-send and bulk notification requests.
 """
 import uuid
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from app.database import get_db
+from app.models.job import NotificationJob
 
 from app.channels.email import send_email
 from app.channels.sms import send_sms
@@ -68,13 +72,20 @@ async def send_single(body: SingleSendRequest):
 
 
 @router.post("/bulk", status_code=status.HTTP_202_ACCEPTED)
-async def send_bulk(body: BulkSendRequest):
+async def send_bulk(body: BulkSendRequest, db: AsyncSession = Depends(get_db)):
     """Enqueue a bulk notification job. Returns job_id immediately."""
     if not body.recipients:
         raise HTTPException(status_code=400, detail="Recipients list is empty")
 
     job_id = str(uuid.uuid4())
-    # TODO: create NotificationJob record in DB here
+    db_job = NotificationJob(
+        job_id=job_id,
+        channel=body.channel,
+        status="queued",
+        total=len(body.recipients),
+    )
+    db.add(db_job)
+    await db.commit()
 
     for r in body.recipients:
         payload = NotifyPayload(
@@ -91,15 +102,24 @@ async def send_bulk(body: BulkSendRequest):
 
 
 @router.get("/jobs/{job_id}")
-async def get_job_status(job_id: str):
+async def get_job_status(job_id: str, db: AsyncSession = Depends(get_db)):
     """
-    Get the current status of a bulk notification job.
-
-    TODO: query the notification_jobs table and return progress.
+    Get the current status of a bulk notification job. 
     """
-    # Placeholder response
+    
+    result = await db.execute(
+        select(NotificationJob).where(NotificationJob.job_id == job_id)
+    )
+    job = result.scalar_one_or_none()
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found")
     return {
-        "job_id": job_id,
-        "status": "not_implemented",
-        "message": "Implement job tracking — query notification_jobs table",
+        "job_id": job.job_id,
+        "channel": job.channel,
+        "status": job.status,
+        "total": job.total,
+        "sent": job.sent,
+        "failed": job.failed,
+        "created_at": job.created_at,
+        "updated_at": job.updated_at,
     }

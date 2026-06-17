@@ -102,3 +102,12 @@ async def queue_stats():
 async def recent_jobs(limit: int = 60):
     """Most recent jobs across all queues."""
     return {"jobs": [j.model_dump() for j in job_store.recent(limit)]}
+
+@router.get("/{job_id}")
+async def get_job(job_id: str):
+    """Get a single job by job_id."""
+    job = job_store.get(job_id)
+    if job is None:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job.model_dump()

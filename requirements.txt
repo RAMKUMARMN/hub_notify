@@ -10,3 +10,5 @@ boto3==1.35.30
 sqlalchemy==2.0.35
 asyncpg==0.30.0
 greenlet==3.5.1
+apscheduler>=3.10.0,<4.0.0
+

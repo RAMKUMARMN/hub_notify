@@ -34,12 +34,22 @@ async def lifespan(app: FastAPI):
         analytics_worker.run,
     ]
     tasks = [asyncio.create_task(w()) for w in workers]
+
+    # Start the scheduled notification database poller
+    from app.scheduler import start_scheduler, stop_scheduler
+    scheduler = start_scheduler()
+
     yield
+
+    # Stop the scheduled notification database poller
+    await stop_scheduler(scheduler)
+
     for t in tasks:
         t.cancel()
     await asyncio.gather(*tasks, return_exceptions=True)
     # Dispose of engine connection pool
     await engine.dispose()
+
 
 
 app = FastAPI(

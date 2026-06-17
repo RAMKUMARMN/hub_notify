@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models import NotificationJob, IndividualNotification
 
-from app.queue.producer import publish
+from app.queue.producer import publish, publish_notification
 from app.queue.schemas import NotifyPayload
 
 router = APIRouter(prefix="/notify", tags=["notify"])
@@ -76,24 +76,18 @@ async def send_single(body: SingleSendRequest, db: AsyncSession = Depends(get_db
         recipient=body.recipient,
         status=status_val,
         attempt=1,
+        subject=body.subject,
+        body=body.body,
+        html_body=body.html_body,
+        title=body.title,
+        data=body.data,
     )
     db.add(ind_notification)
     await db.commit()
 
     if not body.scheduled_at:
-        payload = NotifyPayload(
-            notification_id=notif_id,
-            job_id=job_id,
-            channel=body.channel,
-            recipient=body.recipient,
-            subject=body.subject,
-            body=body.body,
-            html_body=body.html_body,
-            title=body.title,
-            data=body.data,
-        )
         try:
-            await publish(payload)
+            await publish_notification(ind_notification, body.channel)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc))
 
@@ -135,23 +129,17 @@ async def send_bulk(body: BulkSendRequest, db: AsyncSession = Depends(get_db)):
             recipient=r.recipient,
             status=status_val,
             attempt=1,
+            subject=r.subject,
+            body=r.body,
+            html_body=r.html_body,
         )
         db.add(ind_notification)
-        notifications_data.append((r, notif_id))
+        notifications_data.append(ind_notification)
     await db.commit()
 
     if not body.scheduled_at:
-        for r, notif_id in notifications_data:
-            payload = NotifyPayload(
-                notification_id=notif_id,
-                job_id=job_id,
-                channel=body.channel,
-                recipient=r.recipient,
-                subject=r.subject,
-                body=r.body,
-                html_body=r.html_body,
-            )
-            await publish(payload)
+        for ind_notification in notifications_data:
+            await publish_notification(ind_notification, body.channel)
 
     return {"job_id": job_id, "total": len(body.recipients), "status": status_val}
 

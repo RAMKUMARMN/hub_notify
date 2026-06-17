@@ -51,3 +51,37 @@ async def publish(payload: NotifyPayload, routing_key: str | None = None) -> Non
             ),
             routing_key=queue.name,
         )
+
+
+async def publish_notification(
+    notification,
+    channel: str | None = None,
+    db = None,
+) -> None:
+    """Publish an IndividualNotification to the appropriate RabbitMQ queue.
+
+    If channel is not specified, it will be fetched from the corresponding NotificationJob in the database.
+    """
+    if not channel:
+        if not db:
+            raise ValueError("Either channel or db must be provided to publish_notification")
+        from app.models import NotificationJob
+        job = await db.get(NotificationJob, notification.job_id)
+        if not job:
+            raise ValueError(f"NotificationJob not found for job_id: {notification.job_id}")
+        channel = job.channel
+
+    payload = NotifyPayload(
+        notification_id=notification.id,
+        job_id=notification.job_id,
+        channel=channel,
+        recipient=notification.recipient,
+        subject=notification.subject,
+        body=notification.body,
+        html_body=notification.html_body,
+        title=notification.title,
+        data=notification.data,
+        attempt=notification.attempt,
+    )
+    await publish(payload)
+

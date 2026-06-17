@@ -1,9 +1,9 @@
 """
 RabbitMQ producer — publishes notification tasks from the backend API.
 
-Called by the backend (admin bulk create, notification endpoints) to enqueue tasks.
+Called by the backend (admin bulk create, notification endpoints)
+to enqueue tasks.
 """
-import json
 
 import aio_pika
 
@@ -18,7 +18,9 @@ QUEUE_NAMES = {
 }
 
 
-async def publish(payload: NotifyPayload, routing_key: str | None = None) -> None:
+async def publish(
+    payload: NotifyPayload, routing_key: str | None = None
+) -> None:
     """Publish a single notification task to the appropriate RabbitMQ queue."""
     queue_name = routing_key or QUEUE_NAMES.get(payload.channel)
     if not queue_name:
@@ -27,7 +29,7 @@ async def publish(payload: NotifyPayload, routing_key: str | None = None) -> Non
     connection = await aio_pika.connect_robust(settings.rabbitmq_url)
     async with connection:
         channel = await connection.channel()
-        
+
         arguments = None
         if ".retry." in queue_name:
             parts = queue_name.split(".")
@@ -43,7 +45,9 @@ async def publish(payload: NotifyPayload, routing_key: str | None = None) -> Non
             except Exception:
                 pass
 
-        queue = await channel.declare_queue(queue_name, durable=True, arguments=arguments)
+        queue = await channel.declare_queue(
+            queue_name, durable=True, arguments=arguments
+        )
         await channel.default_exchange.publish(
             aio_pika.Message(
                 body=payload.model_dump_json().encode(),
@@ -56,19 +60,26 @@ async def publish(payload: NotifyPayload, routing_key: str | None = None) -> Non
 async def publish_notification(
     notification,
     channel: str | None = None,
-    db = None,
+    db=None,
 ) -> None:
     """Publish an IndividualNotification to the appropriate RabbitMQ queue.
 
-    If channel is not specified, it will be fetched from the corresponding NotificationJob in the database.
+    If channel is not specified, it will be fetched from the
+    corresponding NotificationJob in the database.
     """
     if not channel:
         if not db:
-            raise ValueError("Either channel or db must be provided to publish_notification")
+            raise ValueError(
+                "Either channel or db must be provided to "
+                "publish_notification"
+            )
         from app.models import NotificationJob
         job = await db.get(NotificationJob, notification.job_id)
         if not job:
-            raise ValueError(f"NotificationJob not found for job_id: {notification.job_id}")
+            raise ValueError(
+                f"NotificationJob not found for job_id: "
+                f"{notification.job_id}"
+            )
         channel = job.channel
 
     payload = NotifyPayload(
@@ -84,4 +95,3 @@ async def publish_notification(
         attempt=notification.attempt,
     )
     await publish(payload)
-

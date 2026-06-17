@@ -55,7 +55,7 @@ async def dispatch(payload: NotifyPayload) -> None:
 async def process_message(message: aio_pika.IncomingMessage) -> None:
     async with message.process(requeue=False):
         payload = NotifyPayload(**json.loads(message.body))
-        
+
         # Get base channel name
         base_channel = payload.channel
         if base_channel == "whatsapp":
@@ -63,38 +63,51 @@ async def process_message(message: aio_pika.IncomingMessage) -> None:
 
         try:
             await dispatch(payload)
-            logger.info("Sent %s to %s (job %s)", payload.channel, payload.recipient, payload.job_id)
-            
+            logger.info(
+                "Sent %s to %s (job %s)",
+                payload.channel,
+                payload.recipient,
+                payload.job_id,
+            )
+
             # Update database
             async with async_session() as db:
                 from sqlalchemy import select, func
-                
+
                 # 1. Update individual notification status
                 if payload.notification_id:
                     result = await db.execute(
-                        select(IndividualNotification)
-                        .where(IndividualNotification.id == payload.notification_id)
+                        select(IndividualNotification).where(
+                            IndividualNotification.id
+                            == payload.notification_id
+                        )
                     )
                 else:
                     result = await db.execute(
                         select(IndividualNotification)
                         .where(IndividualNotification.job_id == payload.job_id)
-                        .where(IndividualNotification.recipient == payload.recipient)
+                        .where(
+                            IndividualNotification.recipient
+                            == payload.recipient
+                        )
                     )
                 ind = result.scalars().first()
                 if ind:
                     ind.status = "sent"
                     ind.attempt = payload.attempt
                     await db.flush()
-                
+
                 # 2. Update main job metrics based on current counts
                 counts_res = await db.execute(
-                    select(IndividualNotification.status, func.count(IndividualNotification.id))
+                    select(
+                        IndividualNotification.status,
+                        func.count(IndividualNotification.id),
+                    )
                     .where(IndividualNotification.job_id == payload.job_id)
                     .group_by(IndividualNotification.status)
                 )
                 counts = dict(counts_res.all())
-                
+
                 job = await db.get(NotificationJob, payload.job_id)
                 if job:
                     job.sent = counts.get("sent", 0)
@@ -102,10 +115,15 @@ async def process_message(message: aio_pika.IncomingMessage) -> None:
                     job.retrying = counts.get("retrying", 0)
                     if job.sent + job.failed >= job.total:
                         job.completed = True
-                
+
                 await db.commit()
         except Exception as exc:
-            logger.warning("Failed attempt %d for job %s: %s", payload.attempt, payload.job_id, exc)
+            logger.warning(
+                "Failed attempt %d for job %s: %s",
+                payload.attempt,
+                payload.job_id,
+                exc,
+            )
             if payload.attempt < payload.max_attempts:
                 # Determine retry delay queue
                 next_attempt = payload.attempt + 1
@@ -115,77 +133,106 @@ async def process_message(message: aio_pika.IncomingMessage) -> None:
                 # Update database for retry
                 async with async_session() as db:
                     from sqlalchemy import select, func
-                    
+
                     # 1. Update individual notification status
                     if payload.notification_id:
                         result = await db.execute(
-                            select(IndividualNotification)
-                            .where(IndividualNotification.id == payload.notification_id)
+                            select(IndividualNotification).where(
+                                IndividualNotification.id
+                                == payload.notification_id
+                            )
                         )
                     else:
                         result = await db.execute(
                             select(IndividualNotification)
-                            .where(IndividualNotification.job_id == payload.job_id)
-                            .where(IndividualNotification.recipient == payload.recipient)
+                            .where(
+                                IndividualNotification.job_id == payload.job_id
+                            )
+                            .where(
+                                IndividualNotification.recipient
+                                == payload.recipient
+                            )
                         )
                     ind = result.scalars().first()
                     if ind:
                         ind.status = "retrying"
                         ind.attempt = payload.attempt
                         await db.flush()
-                    
+
                     # 2. Update main job metrics based on current counts
                     counts_res = await db.execute(
-                        select(IndividualNotification.status, func.count(IndividualNotification.id))
+                        select(
+                            IndividualNotification.status,
+                            func.count(IndividualNotification.id),
+                        )
                         .where(IndividualNotification.job_id == payload.job_id)
                         .group_by(IndividualNotification.status)
                     )
                     counts = dict(counts_res.all())
-                    
+
                     job = await db.get(NotificationJob, payload.job_id)
                     if job:
                         job.sent = counts.get("sent", 0)
                         job.failed = counts.get("failed", 0)
                         job.retrying = counts.get("retrying", 0)
-                    
+
                     await db.commit()
 
                 # Re-enqueue by publishing to the specific retry queue
                 payload.attempt = next_attempt
                 await publish(payload, routing_key=retry_q_name)
-                logger.info("Enqueued retry attempt %d to %s", next_attempt, retry_q_name)
+                logger.info(
+                    "Enqueued retry attempt %d to %s",
+                    next_attempt,
+                    retry_q_name,
+                )
             else:
-                logger.error("Permanently failed job %s channel %s", payload.job_id, payload.channel)
-                # Update database for permanent failure (5th try / failed queue)
+                logger.error(
+                    "Permanently failed job %s channel %s",
+                    payload.job_id,
+                    payload.channel,
+                )
+                # Update database for permanent failure
+                # (5th try / failed queue)
                 async with async_session() as db:
                     from sqlalchemy import select, func
-                    
+
                     # 1. Update individual notification status
                     if payload.notification_id:
                         result = await db.execute(
-                            select(IndividualNotification)
-                            .where(IndividualNotification.id == payload.notification_id)
+                            select(IndividualNotification).where(
+                                IndividualNotification.id
+                                == payload.notification_id
+                            )
                         )
                     else:
                         result = await db.execute(
                             select(IndividualNotification)
-                            .where(IndividualNotification.job_id == payload.job_id)
-                            .where(IndividualNotification.recipient == payload.recipient)
+                            .where(
+                                IndividualNotification.job_id == payload.job_id
+                            )
+                            .where(
+                                IndividualNotification.recipient
+                                == payload.recipient
+                            )
                         )
                     ind = result.scalars().first()
                     if ind:
                         ind.status = "failed"
                         ind.attempt = payload.attempt + 1
                         await db.flush()
-                    
+
                     # 2. Update main job metrics based on current counts
                     counts_res = await db.execute(
-                        select(IndividualNotification.status, func.count(IndividualNotification.id))
+                        select(
+                            IndividualNotification.status,
+                            func.count(IndividualNotification.id),
+                        )
                         .where(IndividualNotification.job_id == payload.job_id)
                         .group_by(IndividualNotification.status)
                     )
                     counts = dict(counts_res.all())
-                    
+
                     job = await db.get(NotificationJob, payload.job_id)
                     if job:
                         job.sent = counts.get("sent", 0)
@@ -193,13 +240,16 @@ async def process_message(message: aio_pika.IncomingMessage) -> None:
                         job.retrying = counts.get("retrying", 0)
                         if job.sent + job.failed >= job.total:
                             job.completed = True
-                    
+
                     await db.commit()
 
                 # Publish to failed queue
                 failed_q_name = f"{base_channel}.failed"
                 await publish(payload, routing_key=failed_q_name)
-                logger.info("Enqueued permanently failed message to %s", failed_q_name)
+                logger.info(
+                    "Enqueued permanently failed message to %s",
+                    failed_q_name,
+                )
 
 
 async def run_consumer() -> None:
@@ -213,21 +263,27 @@ async def run_consumer() -> None:
             failed_q_name = f"{base}.failed"
 
             # 1. Declare main processing queue
-            process_queue = await channel.declare_queue(process_q_name, durable=True)
+            process_queue = await channel.declare_queue(
+                process_q_name, durable=True
+            )
 
             # 2. Declare failed queue
             await channel.declare_queue(failed_q_name, durable=True)
 
-            # 3. Declare three separate retry queues for each delay: 60s, 300s, 1800s
+            # 3. Declare three separate retry queues for each delay:
+            # 60s, 300s, 1800s
             for delay in [60, 300, 1800]:
                 retry_q_name = f"{base}.retry.{delay}s"
                 await channel.declare_queue(
                     retry_q_name,
                     durable=True,
                     arguments={
-                        "x-dead-letter-exchange": "",                  # Default direct exchange
-                        "x-dead-letter-routing-key": process_q_name,     # Dead letter back to main queue
-                        "x-message-ttl": delay * 1000,                  # TTL in milliseconds
+                        # Default direct exchange
+                        "x-dead-letter-exchange": "",
+                        # Dead letter back to main queue
+                        "x-dead-letter-routing-key": process_q_name,
+                        # TTL in milliseconds
+                        "x-message-ttl": delay * 1000,
                     }
                 )
 

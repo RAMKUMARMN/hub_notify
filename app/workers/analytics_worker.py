@@ -36,7 +36,10 @@ async def _process(job: Job) -> None:
             (72, "Calculating retention & churn signals…"),
             (85, "Aggregating engagement scores per user…"),
             (95, "Writing results to analytics store…"),
-            (100, f"✓ {event_count:,} events analysed · engagement report ready"),
+            (
+                100,
+                f"✓ {event_count:,} events analysed · engagement report ready",
+            ),
         ],
         "user_logs": [
             (15, f"Ingesting {event_count:,} log lines…"),

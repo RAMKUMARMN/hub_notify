@@ -36,9 +36,13 @@ async def _process(job: Job) -> None:
     total = len(recipients)
     job.total = total
 
-    await job_store.update(job.job_id, JobStatus.PROCESSING, progress=0,
-                           message=f"Preparing bulk email to {total} recipients…",
-                           done_count=0)
+    await job_store.update(
+        job.job_id,
+        JobStatus.PROCESSING,
+        progress=0,
+        message=f"Preparing bulk email to {total} recipients…",
+        done_count=0,
+    )
     await asyncio.sleep(0.3)
 
     sent = 0
@@ -51,9 +55,15 @@ async def _process(job: Job) -> None:
         sent += 1
         pct = int((sent / total) * 100)
         if sent % max(1, total // 10) == 0 or sent == total:
+            msg = (
+                f"Sent {sent}/{total} emails"
+                f"{f' ({failed} failed)' if failed else ''}…"
+            )
             await job_store.update(
-                job.job_id, JobStatus.PROCESSING, progress=pct,
-                message=f"Sent {sent}/{total} emails{f' ({failed} failed)' if failed else ''}…",
+                job.job_id,
+                JobStatus.PROCESSING,
+                progress=pct,
+                message=msg,
                 done_count=sent,
             )
         await asyncio.sleep(random.uniform(0.02, 0.08))

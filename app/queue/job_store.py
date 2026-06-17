@@ -16,7 +16,7 @@ class JobStore:
         self._jobs: dict[str, Job] = {}
         self._subscribers: list[asyncio.Queue] = []
 
-    # ── write ─────────────────────────────────────────────────────────────────
+    # ── write ───────────────────────────────────────────────────────────────
 
     async def add(self, job: Job) -> None:
         self._jobs[job.job_id] = job
@@ -43,7 +43,7 @@ class JobStore:
             job.done_count = done_count
         await self._broadcast(f"job.{status.value}", job)
 
-    # ── read ──────────────────────────────────────────────────────────────────
+    # ── read ────────────────────────────────────────────────────────────────
 
     def stats(self) -> dict:
         """Per-queue counts by status."""
@@ -69,7 +69,7 @@ class JobStore:
             self._jobs.values(), key=lambda j: j.created_at, reverse=True
         )[:limit]
 
-    # ── SSE ───────────────────────────────────────────────────────────────────
+    # ── SSE ─────────────────────────────────────────────────────────────────
 
     def subscribe(self) -> asyncio.Queue:
         q: asyncio.Queue = asyncio.Queue(maxsize=300)

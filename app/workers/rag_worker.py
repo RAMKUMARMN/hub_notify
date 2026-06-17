@@ -26,17 +26,25 @@ async def _process(job: Job) -> None:
     num_files = job.payload.get("num_files", random.randint(3, 20))
     job.total = num_files
 
-    await job_store.update(job.job_id, JobStatus.PROCESSING, progress=0,
-                           message=f"Starting bulk RAG ingest — {num_files} documents…",
-                           done_count=0)
+    await job_store.update(
+        job.job_id,
+        JobStatus.PROCESSING,
+        progress=0,
+        message=f"Starting bulk RAG ingest — {num_files} documents…",
+        done_count=0,
+    )
 
     # Phase 1: text extraction (0–40 %)
     for i in range(num_files):
         await asyncio.sleep(random.uniform(0.3, 0.8))
         pct = int(10 + (i + 1) / num_files * 30)
-        await job_store.update(job.job_id, JobStatus.PROCESSING, progress=pct,
-                               message=f"Extracting text from document {i + 1}/{num_files}…",
-                               done_count=i + 1)
+        await job_store.update(
+            job.job_id,
+            JobStatus.PROCESSING,
+            progress=pct,
+            message=f"Extracting text from document {i + 1}/{num_files}…",
+            done_count=i + 1,
+        )
 
     # Phase 2: chunking + embedding (40–85 %)
     total_chunks = num_files * random.randint(6, 15)
@@ -48,16 +56,31 @@ async def _process(job: Job) -> None:
         await asyncio.sleep(random.uniform(0.05, 0.15))
         pct = int(42 + (c + 1) / total_chunks * 43)
         if c % 5 == 0:
-            await job_store.update(job.job_id, JobStatus.PROCESSING, progress=pct,
-                                   message=f"Embedding chunk {c + 1}/{total_chunks} via nomic-embed-text…")
+            await job_store.update(
+                job.job_id,
+                JobStatus.PROCESSING,
+                progress=pct,
+                message=(
+                    f"Embedding chunk {c + 1}/{total_chunks} "
+                    f"via nomic-embed-text…"
+                ),
+            )
 
     # Phase 3: ChromaDB write (85–100 %)
-    await job_store.update(job.job_id, JobStatus.PROCESSING, progress=88,
-                           message=f"Storing {total_chunks} vectors in ChromaDB…")
+    await job_store.update(
+        job.job_id,
+        JobStatus.PROCESSING,
+        progress=88,
+        message=f"Storing {total_chunks} vectors in ChromaDB…",
+    )
     await asyncio.sleep(random.uniform(0.4, 0.9))
-    await job_store.update(job.job_id, JobStatus.DONE, progress=100,
-                           message=f"✓ {num_files} docs · {total_chunks} vectors indexed",
-                           done_count=num_files)
+    await job_store.update(
+        job.job_id,
+        JobStatus.DONE,
+        progress=100,
+        message=f"✓ {num_files} docs · {total_chunks} vectors indexed",
+        done_count=num_files,
+    )
 
 
 async def run() -> None:

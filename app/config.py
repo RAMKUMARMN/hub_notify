@@ -2,10 +2,14 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8"
+    )
 
     # Database (shared with backend)
-    database_url: str = "postgresql+asyncpg://cixiohub:cixiohub@localhost:5432/cixiohub"
+    database_url: str = (
+        "postgresql+asyncpg://cixiohub:cixiohub@localhost:5432/cixiohub"
+    )
 
     # RabbitMQ
     rabbitmq_url: str = "amqp://guest:guest@localhost:5672/"

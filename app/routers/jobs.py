@@ -9,8 +9,6 @@ Provides:
 """
 from __future__ import annotations
 
-import asyncio
-
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
@@ -42,7 +40,8 @@ _WORKER_MAP = {
 
 @router.post("/submit", status_code=202)
 async def submit_job(body: SubmitJobRequest):
-    """Submit a job — immediately returns the job_id, processing happens async."""
+    """Submit a job — immediately returns the job_id, processing happens async.
+    """
     queue = QUEUE_FOR_TYPE[body.job_type.value]
     job = Job(
         job_type=body.job_type,
@@ -94,7 +93,8 @@ async def stream_events():
 
 @router.get("/stats")
 async def queue_stats():
-    """Snapshot of per-queue counts — suitable for polling every few seconds."""
+    """Snapshot of per-queue counts — suitable for polling every few seconds.
+    """
     return {"queues": list(job_store.stats().values())}
 
 

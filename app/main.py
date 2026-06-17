@@ -21,7 +21,10 @@ from app.workers import (
 async def lifespan(app: FastAPI):
     # Initialize database tables
     from app.database import engine, Base
-    from app.models import NotificationJob, IndividualNotification  # noqa: F401 (Registers models with Base)
+    from app.models import (  # noqa: F401 (Registers models with Base)
+        IndividualNotification,
+        NotificationJob,
+    )
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
@@ -51,11 +54,12 @@ async def lifespan(app: FastAPI):
     await engine.dispose()
 
 
-
 app = FastAPI(
     title="CixioHub Notify Service",
     version="1.0.0",
-    description="Notification service — Email, SMS, Push, WhatsApp + Queue Dashboard",
+    description=(
+        "Notification service — Email, SMS, Push, WhatsApp + Queue Dashboard"
+    ),
     lifespan=lifespan,
 )
 
@@ -84,4 +88,3 @@ async def health(db=Depends(get_db)):
         "service": "cixiohub-notify",
         "database": db_status,
     }
-

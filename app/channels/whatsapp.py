@@ -3,14 +3,14 @@ WhatsApp channel — Twilio WhatsApp API.
 
 Students: implement send_whatsapp() using the Twilio Python SDK.
 """
-from app.config import settings
 
 
 def send_whatsapp(to: str, body: str) -> str:
     """
     Send a WhatsApp message via Twilio.
 
-    The 'to' number must be prefixed with 'whatsapp:+' (e.g. 'whatsapp:+919876543210').
+    The 'to' number must be prefixed with 'whatsapp:+'
+    (e.g. 'whatsapp:+919876543210').
 
     TODO:
       from twilio.rest import Client
@@ -23,5 +23,6 @@ def send_whatsapp(to: str, body: str) -> str:
       return message.sid
     """
     raise NotImplementedError(
-        "Install twilio and implement send_whatsapp() in app/channels/whatsapp.py"
+        "Install twilio and implement send_whatsapp() "
+        "in app/channels/whatsapp.py"
     )

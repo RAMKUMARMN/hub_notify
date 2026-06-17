@@ -3,7 +3,6 @@ SMS channel — sends via Twilio.
 
 Students: implement send_sms() using the Twilio Python SDK.
 """
-from app.config import settings
 
 
 def send_sms(to: str, body: str) -> str:

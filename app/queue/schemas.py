@@ -71,7 +71,7 @@ class SubmitJobRequest(BaseModel):
     payload: dict = {}
 
 
-# ── Legacy payload (backward compat with existing notify router) ──────────────
+# ── Legacy payload (backward compat with existing notify router) ──────────
 
 class NotifyPayload(BaseModel):
     """A single notification task — published to RabbitMQ as JSON."""

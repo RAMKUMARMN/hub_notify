@@ -13,8 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models import NotificationJob, IndividualNotification
 
-from app.queue.producer import publish, publish_notification
-from app.queue.schemas import NotifyPayload
+from app.queue.producer import publish_notification
 
 router = APIRouter(prefix="/notify", tags=["notify"])
 
@@ -44,13 +43,17 @@ class BulkSendRequest(BaseModel):
 
 
 @router.post("/send", status_code=status.HTTP_202_ACCEPTED)
-async def send_single(body: SingleSendRequest, db: AsyncSession = Depends(get_db)):
+async def send_single(
+    body: SingleSendRequest, db: AsyncSession = Depends(get_db)
+):
     """Enqueue a single notification job. Returns job_id immediately."""
     if body.channel not in ["email", "sms", "push", "whatsapp"]:
-        raise HTTPException(status_code=400, detail=f"Unknown channel: {body.channel}")
+        raise HTTPException(
+            status_code=400, detail=f"Unknown channel: {body.channel}"
+        )
 
     job_id = str(uuid.uuid4())
-    
+
     # Create NotificationJob record in DB
     job = NotificationJob(
         job_id=job_id,
@@ -92,7 +95,6 @@ async def send_single(body: SingleSendRequest, db: AsyncSession = Depends(get_db
             raise HTTPException(status_code=400, detail=str(exc))
 
     return {"job_id": job_id, "status": status_val}
-
 
 
 @router.post("/bulk", status_code=status.HTTP_202_ACCEPTED)
@@ -141,7 +143,11 @@ async def send_bulk(body: BulkSendRequest, db: AsyncSession = Depends(get_db)):
         for ind_notification in notifications_data:
             await publish_notification(ind_notification, body.channel)
 
-    return {"job_id": job_id, "total": len(body.recipients), "status": status_val}
+    return {
+        "job_id": job_id,
+        "total": len(body.recipients),
+        "status": status_val,
+    }
 
 
 @router.get("/jobs/{job_id}")
@@ -172,14 +178,18 @@ async def get_job_status(job_id: str, db: AsyncSession = Depends(get_db)):
         "retrying": job.retrying,
         "completed": job.completed,
         "updated_at": job.updated_at.isoformat() if job.updated_at else None,
-        "scheduled_at": job.scheduled_at.isoformat() if job.scheduled_at else None,
+        "scheduled_at": (
+            job.scheduled_at.isoformat() if job.scheduled_at else None
+        ),
         "notifications": [
             {
                 "job_id": n.job_id,
                 "recipient": n.recipient,
                 "status": n.status,
                 "attempt": n.attempt,
-                "updated_at": n.updated_at.isoformat() if n.updated_at else None,
+                "updated_at": (
+                    n.updated_at.isoformat() if n.updated_at else None
+                ),
             }
             for n in notifications
         ],

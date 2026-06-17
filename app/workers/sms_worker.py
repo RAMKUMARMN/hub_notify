@@ -24,7 +24,6 @@ def enqueue(job: Job) -> None:
 
 async def _process(job: Job) -> None:
     recipients: list[str] = job.payload.get("recipients", [])
-    body: str = job.payload.get("body", "CixioHub: Your notification.")
 
     if not recipients:
         n = job.payload.get("count", random.randint(20, 200))
@@ -33,9 +32,13 @@ async def _process(job: Job) -> None:
     total = len(recipients)
     job.total = total
 
-    await job_store.update(job.job_id, JobStatus.PROCESSING, progress=0,
-                           message=f"Queuing {total} SMS messages via gateway…",
-                           done_count=0)
+    await job_store.update(
+        job.job_id,
+        JobStatus.PROCESSING,
+        progress=0,
+        message=f"Queuing {total} SMS messages via gateway…",
+        done_count=0,
+    )
     await asyncio.sleep(0.2)
 
     sent = 0
@@ -47,15 +50,23 @@ async def _process(job: Job) -> None:
         sent += 1
         pct = int((sent / total) * 100)
         if sent % max(1, total // 8) == 0 or sent == total:
+            msg = (
+                f"Dispatched {sent}/{total} SMS"
+                f"{f' ({failed} failed)' if failed else ''}…"
+            )
             await job_store.update(
-                job.job_id, JobStatus.PROCESSING, progress=pct,
-                message=f"Dispatched {sent}/{total} SMS{f' ({failed} failed)' if failed else ''}…",
+                job.job_id,
+                JobStatus.PROCESSING,
+                progress=pct,
+                message=msg,
                 done_count=sent,
             )
         await asyncio.sleep(random.uniform(0.01, 0.05))
 
     await job_store.update(
-        job.job_id, JobStatus.DONE, progress=100,
+        job.job_id,
+        JobStatus.DONE,
+        progress=100,
         message=f"✓ {sent - failed}/{total} delivered · {failed} failed",
         done_count=sent,
     )

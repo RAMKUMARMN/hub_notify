@@ -63,7 +63,8 @@ class JobStore:
             q[job.status.value] += 1
             q["total"] += 1
         return result
-
+    def get(self, job_id: str) -> Job | None:
+        return self._jobs.get(job_id)
     def recent(self, limit: int = 80) -> list[Job]:
         return sorted(
             self._jobs.values(), key=lambda j: j.created_at, reverse=True

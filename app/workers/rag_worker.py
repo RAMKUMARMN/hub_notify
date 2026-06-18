@@ -14,6 +14,8 @@ from app.services.ai_client import (
 )
 from app.queue.job_store import job_store
 from app.queue.schemas import Job, JobStatus
+from app.queue.producer import publish_job
+from app.queue.schemas import JobType
 
 logger = logging.getLogger(__name__)
 
@@ -68,11 +70,26 @@ async def _process(job: Job) -> None:
 
         print("AI CLIENT SUCCESS")
 
+        next_job = Job(
+            job_type=JobType.EMBEDDING_PROCESSING,
+            queue="embedding.processing",
+            label=f"Embedding {filename}",
+            payload=payload,
+        )
+
+        await publish_job(next_job)
+
+        print(
+            f"RAG COMPLETE → {next_job.queue}"
+        )
+
     except Exception as e:
 
         print("RAG WORKER ERROR:", e)
 
         raise
+
+    
 
     
 async def run() -> None:

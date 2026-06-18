@@ -9,7 +9,7 @@ Provides:
 """
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 
 from app.queue.job_store import job_store
@@ -26,8 +26,13 @@ from app.workers import (
     rag_worker,
     sms_worker,
 )
+from app.security import verify_jwt_token
 
-router = APIRouter(prefix="/jobs", tags=["jobs"])
+router = APIRouter(
+    prefix="/jobs",
+    tags=["jobs"],
+    dependencies=[Depends(verify_jwt_token)],
+)
 
 _WORKER_MAP = {
     JobType.FILE_UPLOAD:    file_worker.enqueue,

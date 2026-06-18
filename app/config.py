@@ -11,6 +11,10 @@ class Settings(BaseSettings):
         "postgresql+asyncpg://cixiohub:cixiohub@localhost:5432/cixiohub"
     )
 
+    # JWT Authentication
+    jwt_secret_key: str = "your-shared-backend-secret-key"
+    jwt_algorithm: str = "HS256"
+
     # RabbitMQ
     rabbitmq_url: str = "amqp://guest:guest@localhost:5672/"
     max_retry_attempts: int = 4

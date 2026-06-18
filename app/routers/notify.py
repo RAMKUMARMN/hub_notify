@@ -14,8 +14,13 @@ from app.database import get_db
 from app.models import NotificationJob, IndividualNotification
 
 from app.queue.producer import publish_notification
+from app.security import verify_jwt_token
 
-router = APIRouter(prefix="/notify", tags=["notify"])
+router = APIRouter(
+    prefix="/notify",
+    tags=["notify"],
+    dependencies=[Depends(verify_jwt_token)],
+)
 
 
 class SingleSendRequest(BaseModel):

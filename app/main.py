@@ -1,7 +1,7 @@
 import asyncio
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import get_db
@@ -70,6 +70,35 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def log_request_body(request: Request, call_next):
+    body = await request.body()
+    path = request.url.path
+    method = request.method
+    if body:
+        try:
+            body_str = body.decode("utf-8", errors="ignore")
+            print(
+                f"\n--- Request Body ({method} {path}) ---\n"
+                f"{body_str}\n"
+                "-----------------------------------------"
+            )
+        except Exception as e:
+            print(f"Error decoding request body: {e}")
+    else:
+        print(
+            f"\n--- Request Body ({method} {path}) ---\n"
+            "Empty Body\n"
+            "-----------------------------------------"
+        )
+
+    async def receive():
+        return {"type": "http.request", "body": body, "more_body": False}
+
+    request._receive = receive
+    return await call_next(request)
 
 app.include_router(notify_router, prefix="/api/v1")
 app.include_router(jobs_router, prefix="/api/v1")

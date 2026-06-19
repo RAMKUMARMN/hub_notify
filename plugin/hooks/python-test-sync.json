@@ -1,0 +1,20 @@
+{
+  "id": "cixio.notify.hooks.pytestRun",
+  "name": "Python Pytest Validation",
+  "event": "PostToolUse",
+  "action": {
+    "type": "shellExecution",
+    "command": "python",
+    "args": [
+      "-m",
+      "pytest",
+      "-q"
+    ],
+    "options": {
+      "env": {
+        "TARGET_FILE": "${activeEditorFile}"
+      }
+    }
+  },
+  "timeout": 15000
+}

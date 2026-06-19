@@ -1,0 +1,20 @@
+{
+  "id": "cixio.notify.hooks.blackFormat",
+  "name": "Python Black Formatter Sync",
+  "event": "PostToolUse",
+  "action": {
+    "type": "shellExecution",
+    "command": "python",
+    "args": [
+      "-m",
+      "black",
+      "."
+    ],
+    "options": {
+      "env": {
+        "TARGET_FILE": "${activeEditorFile}"
+      }
+    }
+  },
+  "timeout": 10000
+}

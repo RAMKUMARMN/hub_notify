@@ -1,0 +1,20 @@
+{
+  "id": "cixio.notify.hooks.flake8Lint",
+  "name": "Python Flake8 Linter Sync",
+  "event": "PostToolUse",
+  "action": {
+    "type": "shellExecution",
+    "command": "python",
+    "args": [
+      "-m",
+      "flake8",
+      "."
+    ],
+    "options": {
+      "env": {
+        "TARGET_FILE": "${activeEditorFile}"
+      }
+    }
+  },
+  "timeout": 10000
+}

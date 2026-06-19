@@ -16,9 +16,10 @@ async def _process(job: Job) -> None:
         "Processing memory job %s",
         job.job_id,
     )
-    # Future memory logic
-    # Conversation summarization
-    # Long-term memory storage
+    print("=" * 60)
+    print("PIPELINE COMPLETED")
+    print(f"JOB ID: {job.job_id}")
+    print("=" * 60)
 
 
 async def run() -> None:

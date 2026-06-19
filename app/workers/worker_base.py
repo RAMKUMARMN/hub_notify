@@ -118,7 +118,6 @@ class RabbitMQWorker:
             f"DECLARED QUEUE: {self.queue_name}"
         )
 
-
         await main_queue.consume(
             self.process_message
         )

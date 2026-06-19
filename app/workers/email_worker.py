@@ -1,99 +1,53 @@
-"""
-Bulk email worker — sends large batches of emails via SMTP (Mailpit locally).
-Simulates template rendering, rate-limiting, and per-recipient delivery.
+import pika
+import json
+import sys
+from email import send_real_otp
 
-Queue: notify.bulk_email
-"""
-from __future__ import annotations
-
-import asyncio
-import logging
-import random
-
-from app.channels.email import send_email
-from app.queue.job_store import job_store
-from app.queue.schemas import Job, JobStatus
-from app.database import AsyncSessionLocal
-from app.models.job import NotificationJob
-from sqlalchemy import update
-
-logger = logging.getLogger(__name__)
-
-_queue: asyncio.Queue[Job] = asyncio.Queue()
-
-
-def enqueue(job: Job) -> None:
-    _queue.put_nowait(job)
-
-async def _sync_db(job_id: str, status: str, sent: int, failed: int) -> None:
+def process_queue_message(ch, method, properties, body):
+    print("\n[->] Consumer picked up a task from 'email.process' queue...", flush=True)
+    
     try:
-        async with AsyncSessionLocal() as session:
-            await session.execute(
-                update(NotificationJob)
-                .where(NotificationJob.job_id == job_id)
-                .values(status=status, sent=sent, failed=failed)
-            )
-            await session.commit()
-    except Exception:
-        logger.warning("DB sync failed for job %s", job_id)
+        # Decode the structural payload message dropped by the producer
+        payload = json.loads(body.decode())
+        email = payload.get("email")
+        otp = payload.get("otp")
+        
+        # Trigger the actual delivery logic
+        success = send_real_otp(recipient_email=email, otp_code=otp)
+        
+        if success:
+            # Tell RabbitMQ the message was successfully completely processed
+            ch.basic_ack(delivery_tag=method.delivery_tag)
+            print(" [✓] Task finished cleanly. Acknowledged to RabbitMQ.", flush=True)
+        else:
+            print(" [X] Worker failed delivery. Keeping message in queue.", flush=True)
+            
+    except Exception as e:
+        print(f" [X] Runtime decoding issue: {e}", flush=True)
+        
+    print("\n[*] Status: ONLINE & IDLE. Listening to 'email.process'...", end="", flush=True)
 
+def start_worker():
+    # Establish network connection with your running Docker container broker
+    connection = pika.BlockingConnection(pika.ConnectionParameters(host='localhost'))
+    channel = connection.channel()
+    
+    # Module 5 requirement: Ensure the specific 'email.process' queue exists and is durable [cite: 1]
+    channel.queue_declare(queue='email.process', durable=True)
+    
+    # Listen continuously to the target stream [cite: 1]
+    channel.basic_consume(queue='email.process', on_message_callback=process_queue_message)
+    
+    print("\n==========================================================")
+    print("[*] Cixio Notification Microservice Engine Online.")
+    print("[*] Status: ONLINE & IDLE. Listening to 'email.process'...")
+    print("==========================================================", end="", flush=True)
+    
+    channel.start_consuming()
 
-async def _process(job: Job) -> None:
-    recipients: list[str] = job.payload.get("recipients", [])
-    subject: str = job.payload.get("subject", "CixioHub Notification")
-    body: str = job.payload.get("body", "Hello from CixioHub!")
-
-    if not recipients:
-        # Generate synthetic recipients for demo
-        n = job.payload.get("count", random.randint(10, 100))
-        recipients = [f"student{i + 1}@tkm.edu" for i in range(n)]
-
-    total = len(recipients)
-    job.total = total
-
-    await job_store.update(job.job_id, JobStatus.PROCESSING, progress=0,
-                           message=f"Preparing bulk email to {total} recipients…",
-                           done_count=0)
-    await asyncio.sleep(0.3)
-
-    sent = 0
-    failed = 0
-    for i, recipient in enumerate(recipients):
-        try:
-            await send_email(to=recipient, subject=subject, body=body)
-        except Exception:
-            failed += 1
-        sent += 1
-        pct = int((sent / total) * 100)
-        if sent % max(1, total // 10) == 0 or sent == total:
-            await job_store.update(
-                job.job_id, JobStatus.PROCESSING, progress=pct,
-                message=f"Sent {sent}/{total} emails{f' ({failed} failed)' if failed else ''}…",
-                done_count=sent,
-            )
-            await _sync_db(job.job_id, "processing", sent, failed)
-        await asyncio.sleep(random.uniform(0.02, 0.08))
-
-    final_status = JobStatus.DONE if failed == 0 else (
-        JobStatus.FAILED if failed == total else JobStatus.DONE
-    )
-    await job_store.update(
-        job.job_id, final_status, progress=100,
-        message=f"✓ {sent - failed}/{total} delivered · {failed} failed",
-        done_count=sent,
-    )
-    await _sync_db(job.job_id, final_status.value, sent - failed, failed)
-
-
-async def run() -> None:
-    logger.info("notify.bulk_email worker started")
-    while True:
-        job = await _queue.get()
-        try:
-            await _process(job)
-        except Exception as exc:
-            logger.exception("email_worker error for job %s", job.job_id)
-            await job_store.update(job.job_id, JobStatus.FAILED,
-                                   progress=job.progress, message=str(exc))
-        finally:
-            _queue.task_done()
+if __name__ == '__main__':
+    try:
+        start_worker()
+    except KeyboardInterrupt:
+        print('\n[!] Microservice shutting down.')
+        sys.exit(0)

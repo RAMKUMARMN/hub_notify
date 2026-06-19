@@ -75,14 +75,24 @@ app.add_middleware(
 @app.middleware("http")
 async def log_request_body(request: Request, call_next):
     body = await request.body()
+    path = request.url.path
+    method = request.method
     if body:
         try:
             body_str = body.decode("utf-8", errors="ignore")
-            print(f"\n--- Request Body ({request.method} {request.url.path}) ---\n{body_str}\n-----------------------------------------")
+            print(
+                f"\n--- Request Body ({method} {path}) ---\n"
+                f"{body_str}\n"
+                "-----------------------------------------"
+            )
         except Exception as e:
             print(f"Error decoding request body: {e}")
     else:
-        print(f"\n--- Request Body ({request.method} {request.url.path}) ---\nEmpty Body\n-----------------------------------------")
+        print(
+            f"\n--- Request Body ({method} {path}) ---\n"
+            "Empty Body\n"
+            "-----------------------------------------"
+        )
 
     async def receive():
         return {"type": "http.request", "body": body, "more_body": False}

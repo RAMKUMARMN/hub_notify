@@ -8,7 +8,7 @@ from app.config import settings
 
 def send_push(device_token: str, title: str, body: str, data: dict | None = None) -> str:
     """
-    Send a push notification via Firebase FCM.
+     Send a push notification via Firebase FCM.
 
     Returns the FCM message ID on success.
 

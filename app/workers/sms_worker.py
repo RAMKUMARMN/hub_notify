@@ -13,6 +13,9 @@ import random
 from app.channels.sms import send_sms
 from app.queue.job_store import job_store
 from app.queue.schemas import Job, JobStatus
+from app.database import AsyncSessionLocal
+from app.models.job import NotificationJob
+from sqlalchemy import update
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +24,18 @@ _queue: asyncio.Queue[Job] = asyncio.Queue()
 
 def enqueue(job: Job) -> None:
     _queue.put_nowait(job)
+
+async def _sync_db(job_id: str, status: str, sent: int, failed: int) -> None:
+    try:
+        async with AsyncSessionLocal() as session:
+            await session.execute(
+                update(NotificationJob)
+                .where(NotificationJob.job_id == job_id)
+                .values(status=status, sent=sent, failed=failed)
+            )
+            await session.commit()
+    except Exception:
+        logger.warning("DB sync failed for job %s", job_id)
 
 
 async def _process(job: Job) -> None:
@@ -76,6 +91,7 @@ async def _process(job: Job) -> None:
                 f"{f' ({failed} failed)' if failed else ''}…",
                 done_count=sent,
             )
+            await _sync_db(job.job_id, "processing", sent, failed)
 
         await asyncio.sleep(random.uniform(0.01, 0.05))
 
@@ -92,6 +108,7 @@ async def _process(job: Job) -> None:
         message=f"✓ {sent - failed}/{total} delivered · {failed} failed",
         done_count=sent,
     )
+    await _sync_db(job.job_id, final_status.value, sent - failed, failed)
 
 
 async def run() -> None:

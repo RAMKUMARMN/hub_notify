@@ -342,5 +342,4 @@ CMD ["/usr/bin/supervisord"]
 
 ---
 
-## Related Repositories
 

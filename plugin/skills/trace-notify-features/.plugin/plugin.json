@@ -1,0 +1,10 @@
+{
+    "id": "trace-notify-features",
+    "name": "trace-notify-features",
+    "type": "skill",
+    "repository": "hub_notify",
+    "enabled": true,
+    "version": "1.0.0",
+    "mcp_server": "",
+    "tool": ""
+}

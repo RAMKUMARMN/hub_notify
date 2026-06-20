@@ -1,0 +1,10 @@
+{
+    "id":  "discover-notify-architecture",
+    "name":  "discover-notify-architecture",
+    "type":  "skill",
+    "repository":  "hub_notify",
+    "enabled":  true,
+    "version":  "1.0.0",
+    "mcp_server":  "mcp_hub_notify",
+    "tool":  "discoverNotifyArchitecture"
+}

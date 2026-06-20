@@ -5,6 +5,7 @@ Called by the backend (admin bulk create, notification endpoints)
 to enqueue tasks.
 """
 
+import asyncio
 import aio_pika
 
 from app.config import settings
@@ -21,7 +22,7 @@ QUEUE_NAMES = {
 async def publish(
     payload: NotifyPayload, routing_key: str | None = None
 ) -> None:
-    """Publish a single notification task to RabbitMQ with publisher retries."""
+    """Publish notification task to RabbitMQ with publisher retries."""
     import logging
     logger = logging.getLogger(__name__)
 
@@ -40,7 +41,7 @@ async def publish(
                 )
 
                 # Declare Dead Letter Exchange (DLX)
-                dlx = await channel.declare_exchange(
+                await channel.declare_exchange(
                     "dla.exchange",
                     aio_pika.ExchangeType.DIRECT,
                     durable=True
@@ -59,9 +60,10 @@ async def publish(
                             delay_str = parts[-1].replace("s", "")
                             delay_sec = int(delay_str)
                             base_channel = parts[0]
+                            rt_key = f"{base_channel}.process"
                             arguments = {
                                 "x-dead-letter-exchange": "",
-                                "x-dead-letter-routing-key": f"{base_channel}.process",
+                                "x-dead-letter-routing-key": rt_key,
                                 "x-message-ttl": delay_sec * 1000,
                             }
                         except Exception:
@@ -92,10 +94,19 @@ async def publish(
             return
         except Exception as exc:
             if attempt == max_publish_attempts:
-                logger.error("Failed to publish message after %d attempts: %s", max_publish_attempts, exc)
+                logger.error(
+                    "Failed to publish message after %d attempts: %s",
+                    max_publish_attempts,
+                    exc,
+                )
                 raise exc
             backoff = (2 ** attempt) * 0.1
-            logger.warning("Publish attempt %d failed: %s. Retrying in %.2f seconds...", attempt, exc, backoff)
+            logger.warning(
+                "Publish attempt %d failed: %s. Retrying in %.2f seconds...",
+                attempt,
+                exc,
+                backoff,
+            )
             await asyncio.sleep(backoff)
 
 

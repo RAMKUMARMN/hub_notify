@@ -23,8 +23,12 @@ class IndividualNotification(Base):
     recipient: Mapped[str] = mapped_column(String, nullable=False)
     status: Mapped[str] = mapped_column(String, default="queued", index=True)
     attempt: Mapped[int] = mapped_column(Integer, default=1)
-    priority: Mapped[str] = mapped_column(String, default="high", nullable=False)
-    message_type: Mapped[str] = mapped_column(String, default="general", nullable=False)
+    priority: Mapped[str] = mapped_column(
+        String, default="high", nullable=False
+    )
+    message_type: Mapped[str] = mapped_column(
+        String, default="general", nullable=False
+    )
 
     subject: Mapped[str | None] = mapped_column(String, nullable=True)
     body: Mapped[str] = mapped_column(String, default="", nullable=False)

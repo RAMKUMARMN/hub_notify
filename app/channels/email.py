@@ -78,6 +78,7 @@ async def send_email(
     except aiosmtplib.SMTPException as exc:
         logger.exception("SMTP error while sending email to %s", to)
         raise Exception(f"SMTP error: {exc}") from exc
+    
 
     except Exception as exc:
         logger.exception("Unexpected email error for %s", to)

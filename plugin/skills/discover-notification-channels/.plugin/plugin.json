@@ -1,0 +1,10 @@
+{
+    "id":  "discover-notification-channels",
+    "name":  "discover-notification-channels",
+    "type":  "skill",
+    "repository":  "hub_notify",
+    "enabled":  true,
+    "version":  "1.0.0",
+    "mcp_server":  "mcp_hub_notify",
+    "tool":  "discoverNotificationChannels"
+}

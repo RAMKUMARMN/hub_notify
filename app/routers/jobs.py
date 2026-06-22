@@ -21,23 +21,12 @@ from app.queue.schemas import (
     QUEUE_FOR_TYPE,
     SubmitJobRequest,
 )
-from app.workers import (
-    analytics_worker,
-    email_worker,
-    file_worker,
-    rag_worker,
-    sms_worker,
-)
+
+
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
-_WORKER_MAP = {
-    JobType.FILE_UPLOAD:    file_worker.enqueue,
-    JobType.RAG_BULK_INGEST: rag_worker.enqueue,
-    JobType.BULK_EMAIL:     email_worker.enqueue,
-    JobType.BULK_SMS:       sms_worker.enqueue,
-    JobType.ANALYTICS:      analytics_worker.enqueue,
-}
+
 
 
 @router.post("/submit", status_code=202)

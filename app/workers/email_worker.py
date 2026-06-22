@@ -1,82 +1,206 @@
-"""
-Bulk email worker — sends large batches of emails via SMTP (Mailpit locally).
-Simulates template rendering, rate-limiting, and per-recipient delivery.
-
-Queue: notify.bulk_email
-"""
 from __future__ import annotations
 
 import asyncio
 import logging
-import random
+
+import aio_pika
 
 from app.channels.email import send_email
-from app.queue.job_store import job_store
-from app.queue.schemas import Job, JobStatus
+from app.config import settings
+from app.queue.schemas import (
+    NotifyPayload,
+    EMAIL_PROCESS_QUEUE,
+    EMAIL_RETRY_QUEUE,
+    EMAIL_FAILED_QUEUE,
+)
 
 logger = logging.getLogger(__name__)
 
-_queue: asyncio.Queue[Job] = asyncio.Queue()
+# Global RabbitMQ channel
+channel: aio_pika.Channel | None = None
 
 
-def enqueue(job: Job) -> None:
-    _queue.put_nowait(job)
+
+# PUBLISH TO QUEUE
+
+async def publish_to_queue(
+    queue_name: str,
+    payload: NotifyPayload,
+):
+
+    global channel
+
+    await channel.default_exchange.publish(
+
+        aio_pika.Message(
+            body=payload.model_dump_json().encode(),
+            delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
+        ),
+
+        routing_key=queue_name,
+    )
 
 
-async def _process(job: Job) -> None:
-    recipients: list[str] = job.payload.get("recipients", [])
-    subject: str = job.payload.get("subject", "CixioHub Notification")
-    body: str = job.payload.get("body", "Hello from CixioHub!")
+# RETRY DELAY LOGIC
 
-    if not recipients:
-        # Generate synthetic recipients for demo
-        n = job.payload.get("count", random.randint(10, 100))
-        recipients = [f"student{i + 1}@tkm.edu" for i in range(n)]
 
-    total = len(recipients)
-    job.total = total
+def retry_delay(attempt: int) -> int:
+    """
+    Returns delay in seconds based on retry attempt.
 
-    await job_store.update(job.job_id, JobStatus.PROCESSING, progress=0,
-                           message=f"Preparing bulk email to {total} recipients…",
-                           done_count=0)
-    await asyncio.sleep(0.3)
+    Attempt 2 → 1 minute
+    Attempt 3 → 5 minutes
+    Attempt 4 → 30 minutes
+    """
 
-    sent = 0
-    failed = 0
-    for i, recipient in enumerate(recipients):
-        try:
-            await send_email(to=recipient, subject=subject, body=body)
-        except Exception:
-            failed += 1
-        sent += 1
-        pct = int((sent / total) * 100)
-        if sent % max(1, total // 10) == 0 or sent == total:
-            await job_store.update(
-                job.job_id, JobStatus.PROCESSING, progress=pct,
-                message=f"Sent {sent}/{total} emails{f' ({failed} failed)' if failed else ''}…",
-                done_count=sent,
+    delays = {
+        2: 60,        # 1 minute
+        3: 300,       # 5 minutes
+        4: 1800,      # 30 minutes
+    }
+
+    return delays.get(attempt, 60)
+
+
+# PROCESS MESSAGE
+
+async def process_message(
+    message: aio_pika.IncomingMessage,
+):
+
+    payload = NotifyPayload.model_validate_json(
+        message.body.decode()
+    )
+
+    try:
+
+        logger.info(
+            f"Sending email to {payload.recipient}"
+        )
+
+      
+        # SEND EMAIL
+      
+
+        await send_email(
+            to=payload.recipient,
+            subject=payload.subject or "",
+            body=payload.body,
+            html_body=payload.html_body,
+        )
+
+        logger.info(
+            f"Email sent successfully to {payload.recipient}"
+        )
+
+        # acknowledge success
+        await message.ack()
+
+    except Exception:
+
+        logger.exception(
+            f"Email failed for {payload.recipient}"
+        )
+
+        # MAX RETRIES REACHED
+        
+
+        if payload.attempt >= payload.max_attempts:
+
+            logger.error(
+                f"Email permanently failed "
+                f"for {payload.recipient}"
             )
-        await asyncio.sleep(random.uniform(0.02, 0.08))
 
-    final_status = JobStatus.DONE if failed == 0 else (
-        JobStatus.FAILED if failed == total else JobStatus.DONE
+            await publish_to_queue(
+                EMAIL_FAILED_QUEUE,
+                payload,
+            )
+
+        else:
+
+           
+            # RETRY
+           
+
+            payload.attempt += 1
+
+            logger.warning(
+                f"Retrying email "
+                f"({payload.attempt}/{payload.max_attempts})"
+            )
+
+            # retry delay
+            delay = retry_delay(payload.attempt)
+
+            logger.warning(
+            f"Waiting {delay} seconds before retry"
+            )
+
+            await asyncio.sleep(delay)
+
+            await publish_to_queue(
+                EMAIL_RETRY_QUEUE,
+                payload,
+            )
+
+        # remove original failed message
+        await message.ack()
+
+
+# START WORKER
+
+async def run():
+
+    global channel
+
+  
+    # CONNECT RABBITMQ
+   
+
+    connection = await aio_pika.connect_robust(
+        settings.rabbitmq_url
     )
-    await job_store.update(
-        job.job_id, final_status, progress=100,
-        message=f"✓ {sent - failed}/{total} delivered · {failed} failed",
-        done_count=sent,
+
+    channel = await connection.channel()
+
+   
+    # DECLARE QUEUES
+   
+
+    process_queue = await channel.declare_queue(
+        EMAIL_PROCESS_QUEUE,
+        durable=True,
     )
 
+    retry_queue = await channel.declare_queue(
+        EMAIL_RETRY_QUEUE,
+        durable=True,
+    )
 
-async def run() -> None:
-    logger.info("notify.bulk_email worker started")
-    while True:
-        job = await _queue.get()
-        try:
-            await _process(job)
-        except Exception as exc:
-            logger.exception("email_worker error for job %s", job.job_id)
-            await job_store.update(job.job_id, JobStatus.FAILED,
-                                   progress=job.progress, message=str(exc))
-        finally:
-            _queue.task_done()
+    failed_queue = await channel.declare_queue(
+        EMAIL_FAILED_QUEUE,
+        durable=True,
+    )
+
+    # CONSUMERS
+   
+
+    await process_queue.consume(process_message)
+
+    await retry_queue.consume(process_message)
+
+    logger.info("Email worker started")
+
+    # keep worker alive forever
+    await asyncio.Future()
+
+
+
+# ENTRYPOINT
+
+if __name__ == "__main__":
+
+    logging.basicConfig(level=logging.INFO)
+
+    asyncio.run(run())

@@ -83,9 +83,28 @@ async def publish(
                     )
                 else:
                     # Publish to the main exchange with priority routing key
+                    # Format must strictly match notification_queues.md (no job_id, notification_id, etc.)
+                    allowed_fields = {
+                        "channel",
+                        "recipient",
+                        "subject",
+                        "body",
+                        "html_body",
+                        "title",
+                        "message_type",
+                        "priority",
+                        "data",
+                    }
+                    priority_payload = payload.model_dump(include=allowed_fields)
+                    if not priority_payload.get("title"):
+                        priority_payload["title"] = payload.subject
+                    if priority_payload.get("data") is None:
+                        priority_payload["data"] = {}
+                    
+                    import json
                     await exchange.publish(
                         aio_pika.Message(
-                            body=payload.model_dump_json().encode(),
+                            body=json.dumps(priority_payload).encode("utf-8"),
                             delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
                         ),
                         routing_key=priority,
@@ -149,4 +168,5 @@ async def publish_notification(
         priority=getattr(notification, "priority", "high"),
         message_type=getattr(notification, "message_type", "general"),
     )
-    await publish(payload)
+    routing_key = QUEUE_NAMES.get(channel)
+    await publish(payload, routing_key=routing_key)

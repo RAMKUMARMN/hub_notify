@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     smtp_username: str = ""
     smtp_password: str = ""
     smtp_from_email: str = "noreply@cixiohub.com"
+    smtp_starttls: bool = True
 
     # Twilio (SMS + WhatsApp)
     twilio_account_sid: str = ""

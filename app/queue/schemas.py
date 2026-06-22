@@ -6,6 +6,23 @@ from enum import Enum
 
 from pydantic import BaseModel, Field
 
+EMAIL_PROCESS_QUEUE = "email.process"
+EMAIL_RETRY_QUEUE = "email.retry"
+EMAIL_FAILED_QUEUE = "email.failed"
+
+
+SMS_PROCESS_QUEUE = "sms.process"
+SMS_RETRY_QUEUE = "sms.retry"
+SMS_FAILED_QUEUE = "sms.failed"
+
+PUSH_PROCESS_QUEUE = "push.process"
+PUSH_RETRY_QUEUE = "push.retry"
+PUSH_FAILED_QUEUE = "push.failed"
+
+WHATSAPP_PROCESS_QUEUE = "whatsapp.process"
+WHATSAPP_RETRY_QUEUE = "whatsapp.retry"
+WHATSAPP_FAILED_QUEUE = "whatsapp.failed"
+
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -17,6 +34,12 @@ class JobType(str, Enum):
     BULK_EMAIL = "bulk_email"
     BULK_SMS = "bulk_sms"
     ANALYTICS = "analytics"
+    BULK_PUSH = "bulk_push"
+    # New job types
+    AI_ORCHESTRATION = "ai_orchestration"
+    EMBEDDING_PROCESS = "embedding_process"
+    MEMORY_PROCESSING = "memory_processing"
+    WHATSAPP = "whatsapp"
 
 
 class JobStatus(str, Enum):
@@ -26,27 +49,88 @@ class JobStatus(str, Enum):
     FAILED = "failed"
 
 
+# Maps job/channel type → primary queue name.
+# Each queue also has a corresponding DLQ named with a ".dlq" suffix
+# (e.g. "file.uploads" → DLQ is "file.uploads.dlq").
 QUEUE_FOR_TYPE: dict[str, str] = {
-    "file_upload":     "file.uploads",
-    "rag_bulk_ingest": "rag.bulk_ingest",
-    "bulk_email":      "notify.bulk_email",
-    "bulk_sms":        "notify.bulk_sms",
-    "analytics":       "analytics.events",
-    "email":           "email.process",
-    "sms":             "sms.process",
-    "push":            "push.process",
-}
 
+     "email": EMAIL_PROCESS_QUEUE,
+    "sms": SMS_PROCESS_QUEUE,
+    "push": PUSH_PROCESS_QUEUE,
+    "whatsapp": WHATSAPP_PROCESS_QUEUE,
+
+    "bulk_email": EMAIL_PROCESS_QUEUE,
+    "bulk_sms": SMS_PROCESS_QUEUE,
+    "bulk_push": PUSH_PROCESS_QUEUE,
+
+    # Single notification queues
+   
+
+    
+
+    # File handling
+    "file_upload": "file.uploads",
+
+    # RAG / ML
+    "rag_bulk_ingest": "rag.bulk_ingest",
+    "embedding_process": "embedding_process",
+    "memory_processing": "memory.processing",
+    "ai_orchestration": "ai_orchestration",
+
+    # Analytics
+    "analytics": "analytics.events",
+}
+# All primary queues. For every queue here, a matching DLQ
+# ("<queue>.dlq") must also be declared — see producer.py.
 ALL_QUEUES = [
+
+    # EMAIL
+   
+  EMAIL_PROCESS_QUEUE,
+  EMAIL_RETRY_QUEUE,
+  EMAIL_FAILED_QUEUE,
+   
+    # SMS
+  SMS_PROCESS_QUEUE,
+    SMS_RETRY_QUEUE,
+    SMS_FAILED_QUEUE,
+
+    # PUSH
+   
+    PUSH_PROCESS_QUEUE,
+    PUSH_RETRY_QUEUE,
+    PUSH_FAILED_QUEUE,
+
+  
+    # WHATSAPP
+   
+    WHATSAPP_PROCESS_QUEUE,
+    WHATSAPP_RETRY_QUEUE,
+    WHATSAPP_FAILED_QUEUE,
+
+   
+    # FILES
+   
     "file.uploads",
+
+  
+    # RAG / ML
+   
     "rag.bulk_ingest",
-    "notify.bulk_email",
-    "notify.bulk_sms",
+    "embedding_process",
+    "memory.processing",
+    "ai_orchestration",
+
+  
+    # ANALYTICS
+  
     "analytics.events",
-    "email.process",
-    "sms.process",
-    "push.process",
 ]
+
+# Dead-letter queues (DLQs) — messages are routed here automatically
+# after exhausting retries on their primary queue. Declared alongside
+# primary queues so they exist before any consumer starts.
+ALL_DLQS = [f"{q}.dlq" for q in ALL_QUEUES]
 
 
 class Job(BaseModel):

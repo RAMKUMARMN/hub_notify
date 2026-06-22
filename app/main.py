@@ -17,19 +17,9 @@ from app.workers import (
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Start all queue workers as background tasks
-    workers = [
-        file_worker.run,
-        rag_worker.run,
-        email_worker.run,
-        sms_worker.run,
-        analytics_worker.run,
-    ]
-    tasks = [asyncio.create_task(w()) for w in workers]
+    print("Application started")
     yield
-    for t in tasks:
-        t.cancel()
-    await asyncio.gather(*tasks, return_exceptions=True)
+    print("Application shutdown")
 
 
 app = FastAPI(

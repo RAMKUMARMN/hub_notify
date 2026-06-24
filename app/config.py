@@ -12,11 +12,14 @@ class Settings(BaseSettings):
     max_retry_attempts: int = 4
 
     # Email (SMTP)
-    smtp_host: str = "smtp.gmail.com"
+    smtp_host: str = "smtp.sendgrid.net"
     smtp_port: int = 587
     smtp_username: str = ""
     smtp_password: str = ""
-    smtp_from_email: str = "noreply@cixiohub.com"
+    smtp_from_email: str = ""
+    smtp_use_tls: bool = False
+    smtp_start_tls: bool = True
+    
 
     # Twilio (SMS + WhatsApp)
     twilio_account_sid: str = ""

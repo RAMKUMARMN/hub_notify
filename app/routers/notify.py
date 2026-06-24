@@ -172,3 +172,74 @@ async def get_job_status(job_id: str):
         "status": "not_implemented",
         "message": "Implement job tracking later",
     }
+@router.post("/send")
+async def send_single(
+    body: SingleSendRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Send a single notification immediately."""
+
+    notification = Notification(
+        recipient=body.recipient,
+        channel=body.channel,
+        subject=body.subject,
+        body=body.body,
+        status="PENDING",
+        attempts=0,
+    )
+
+    db.add(notification)
+    await db.commit()
+    await db.refresh(notification)
+
+    try:
+        notification.status = "PROCESSING"
+        await db.commit()
+
+        match body.channel:
+            case "email":
+                # Updated to pass correct arguments to your email service
+                msg_id = await send_email(
+                    to=body.recipient,
+                    subject=body.subject or "Notification",
+                    body=body.body,
+                    html_body=body.html_body,
+                )
+
+            case "sms":
+                msg_id = send_sms(to=body.recipient, body=body.body)
+
+            case "push":
+                msg_id = send_push(
+                    device_token=body.recipient,
+                    title=body.title or "CixioHub",
+                    body=body.body,
+                    data=body.data,
+                )
+
+            case _:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Unknown channel: {body.channel}",
+                )
+
+        notification.status = "SENT"
+        await db.commit()
+
+        return {
+            "status": "sent",
+            "message_id": msg_id,
+            "notification_id": notification.id,
+        }
+
+    except Exception as exc:
+        notification.status = "FAILED"
+        notification.attempts += 1
+        notification.error_message = str(exc)
+        await db.commit()
+
+        # Improved error reporting
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Failed to send {body.channel} notification: {str(exc)}",
+        )

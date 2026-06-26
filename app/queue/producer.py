@@ -16,7 +16,7 @@ import aio_pika
 from aio_pika.abc import AbstractChannel
 
 from app.config import settings
-from app.queue.schemas import NotifyPayload, ALL_QUEUES, ALL_DLQS
+from app.queue.schemas import NotifyPayload, ALL_QUEUES
 
 # ── Queue name maps ───────────────────────────────────────────────────────────
 
@@ -40,59 +40,184 @@ async def _get_connection() -> aio_pika.RobustConnection:
 
 
 async def setup_queues() -> None:
-    """
-    Declare all primary queues and their dead-letter queues (DLQs).
 
-    Call once at application startup (e.g. in a FastAPI lifespan handler).
-    Each primary queue is configured with a dead-letter exchange so that
-    messages exceeding max retries are automatically routed to the
-    corresponding "<queue>.dlq" queue instead of being discarded.
-
-    Queue layout
-    ─────────────
-      Primary queue  ──(on reject/expire)──►  DLX exchange  ──►  <queue>.dlq
-
-    The DLX (dead-letter exchange) is a simple direct exchange.
-    """
     global _channel
 
     connection = await _get_connection()
     _channel = await connection.channel()
 
-    # Name of the dead-letter exchange shared by all primary queues.
-    dlx_name = "dlx"
+    # -------------------------------------------------
+    # DECLARE MAIN PROCESS QUEUES
+    # -------------------------------------------------
 
-    # Declare the single DLX that all primary queues point to.
-    dlx = await _channel.declare_exchange(
-        dlx_name,
-        aio_pika.ExchangeType.DIRECT,
-        durable=True,
-    )
+    process_queues = [
+        "email.process",
+        "sms.process",
+        "push.process",
+        "whatsapp.process",
+    ]
 
-    for queue_name in ALL_QUEUES:
+    # -------------------------------------------------
+    # DECLARE DLQs
+    # -------------------------------------------------
+
+    for queue_name in process_queues:
+
         dlq_name = f"{queue_name}.dlq"
 
-        # 1. Declare the DLQ first (must exist before the primary queue
-        #    tries to route rejected messages to it).
-        dlq = await _channel.declare_queue(dlq_name, durable=True)
-
-        # Bind the DLQ to the DLX using the primary queue name as the
-        # routing key — that is what RabbitMQ uses when re-routing.
-        await dlq.bind(dlx, routing_key=queue_name)
-
-        # 2. Declare the primary queue with dead-letter routing arguments.
+        # MAIN PROCESS QUEUE
         await _channel.declare_queue(
             queue_name,
             durable=True,
-            arguments={
-                # Route rejected/expired messages to the DLX.
-                "x-dead-letter-exchange": dlx_name,
-                # Use the queue's own name as routing key so messages land
-                # on the correct per-queue DLQ.
-                "x-dead-letter-routing-key": queue_name,
-            },
         )
 
+        # FINAL DEAD LETTER QUEUE
+        await _channel.declare_queue(
+            dlq_name,
+            durable=True,
+        )
+
+    # -------------------------------------------------
+    # EMAIL RETRY QUEUES
+    # -------------------------------------------------
+
+    await _channel.declare_queue(
+        "email.retry.1m",
+        durable=True,
+        arguments={
+            "x-message-ttl": 60000,
+            "x-dead-letter-exchange": "",
+            "x-dead-letter-routing-key": "email.process",
+        },
+    )
+
+    await _channel.declare_queue(
+        "email.retry.5m",
+        durable=True,
+        arguments={
+            "x-message-ttl": 300000,
+            "x-dead-letter-exchange": "",
+            "x-dead-letter-routing-key": "email.process",
+        },
+    )
+
+    await _channel.declare_queue(
+        "email.retry.30m",
+        durable=True,
+        arguments={
+            "x-message-ttl": 1800000,
+            "x-dead-letter-exchange": "",
+            "x-dead-letter-routing-key": "email.process",
+        },
+    )
+
+    # -------------------------------------------------
+    # SMS RETRY QUEUES
+    # -------------------------------------------------
+    # -------------------------------------------------
+# SMS RETRY QUEUES
+# -------------------------------------------------
+
+    await _channel.declare_queue(
+    "sms.retry.1m",
+    durable=True,
+    arguments={
+        "x-message-ttl": 60000,
+        "x-dead-letter-exchange": "",
+        "x-dead-letter-routing-key": "sms.process",
+    },
+)
+
+    await _channel.declare_queue(
+    "sms.retry.5m",
+    durable=True,
+    arguments={
+        "x-message-ttl": 300000,
+        "x-dead-letter-exchange": "",
+        "x-dead-letter-routing-key": "sms.process",
+    },
+)
+
+    await _channel.declare_queue(
+    "sms.retry.30m",
+    durable=True,
+    arguments={
+        "x-message-ttl": 1800000,
+        "x-dead-letter-exchange": "",
+        "x-dead-letter-routing-key": "sms.process",
+    },
+)
+    
+
+    # -------------------------------------------------
+# PUSH RETRY QUEUES
+# -------------------------------------------------
+
+    await _channel.declare_queue(
+    "push.retry.1m",
+    durable=True,
+    arguments={
+        "x-message-ttl": 60000,
+        "x-dead-letter-exchange": "",
+        "x-dead-letter-routing-key": "push.process",
+    },
+)
+
+    await _channel.declare_queue(
+    "push.retry.5m",
+    durable=True,
+    arguments={
+        "x-message-ttl": 300000,
+        "x-dead-letter-exchange": "",
+        "x-dead-letter-routing-key": "push.process",
+    },
+)
+
+    await _channel.declare_queue(
+    "push.retry.30m",
+    durable=True,
+    arguments={
+        "x-message-ttl": 1800000,
+        "x-dead-letter-exchange": "",
+        "x-dead-letter-routing-key": "push.process",
+    },
+)
+    
+
+    # -------------------------------------------------
+# WHATSAPP RETRY QUEUES
+# -------------------------------------------------
+
+    await _channel.declare_queue(
+    "whatsapp.retry.1m",
+    durable=True,
+    arguments={
+        "x-message-ttl": 60000,
+        "x-dead-letter-exchange": "",
+        "x-dead-letter-routing-key": "whatsapp.process",
+    },
+)
+
+    await _channel.declare_queue(
+    "whatsapp.retry.5m",
+    durable=True,
+    arguments={
+        "x-message-ttl": 300000,
+        "x-dead-letter-exchange": "",
+        "x-dead-letter-routing-key": "whatsapp.process",
+    },
+)
+
+    await _channel.declare_queue(
+    "whatsapp.retry.30m",
+    durable=True,
+    arguments={
+        "x-message-ttl": 1800000,
+        "x-dead-letter-exchange": "",
+        "x-dead-letter-routing-key": "whatsapp.process",
+    },
+)
+    print("RabbitMQ queues initialized")
 
 async def publish(payload: NotifyPayload) -> None:
     """

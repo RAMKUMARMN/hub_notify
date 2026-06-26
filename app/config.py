@@ -39,5 +39,7 @@ class Settings(BaseSettings):
     # AI Service
     ai_service_url: str = "http://localhost:8003"
 
+    upload_dir: str = "/app/uploads"
+
 
 settings = Settings()

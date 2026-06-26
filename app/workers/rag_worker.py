@@ -8,14 +8,17 @@ from __future__ import annotations
 from app.workers.worker_base import RabbitMQWorker
 import asyncio
 import logging
-import random
+from pathlib import Path
 from app.services.ai_client import (
     ai_client,
 )
+from app.services.backend_client import backend_client
 from app.queue.job_store import job_store
 from app.queue.schemas import Job, JobStatus
-from app.queue.producer import publish_job
-from app.queue.schemas import JobType
+from app.config import settings
+
+from pathlib import Path
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +45,8 @@ async def _process(job: Job) -> None:
         document_id = payload.get("document_id")
         user_id = payload.get("user_id")
         storage_path = payload.get("storage_path")
+        UPLOAD_DIR = Path(settings.upload_dir)
+        absolute_path = str(UPLOAD_DIR / storage_path)
         file_type = payload.get("file_type")
         filename = payload.get("filename")
 
@@ -61,27 +66,44 @@ async def _process(job: Job) -> None:
 
         print("JOB STORE UPDATE SUCCESS")
 
-        await ai_client.ingest_document(
+        result = await ai_client.ingest_document(
             document_id=document_id,
             user_id=user_id,
-            storage_path=storage_path,
+            storage_path=absolute_path,
             file_type=file_type,
+            filename=filename,
         )
 
-        print("AI CLIENT SUCCESS")
+        print(result)
 
-        next_job = Job(
-            job_type=JobType.EMBEDDING_PROCESSING,
-            queue="embedding.processing",
-            label=f"Embedding {filename}",
-            payload=payload,
+        try:
+
+            await backend_client.mark_document_processed(
+                document_id=document_id,
+            )
+
+        except Exception:
+
+            logger.exception(
+                "Could not update backend document status."
+            )
+
+
+        await job_store.update(
+            job.job_id,
+            JobStatus.DONE,
+            progress=100,
+            message="Document indexed successfully.",
         )
 
-        await publish_job(next_job)
-
-        print(
-            f"RAG COMPLETE → {next_job.queue}"
+        logger.info(
+            "Document %s successfully indexed.",
+            filename,
         )
+
+        print("=" * 60)
+        print("DOCUMENT INDEXED SUCCESSFULLY")
+        print("=" * 60)
 
     except Exception as e:
 

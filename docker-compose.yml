@@ -1,0 +1,8 @@
+hub_notify_api:
+  image: smarthub-notify
+  command: uvicorn app.main:app --host 0.0.0.0 --port 8001
+
+hub_notify_worker:
+  restart: unless-stopped
+  image: smarthub-notify
+  command: python -m app.workers.main

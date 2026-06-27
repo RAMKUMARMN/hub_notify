@@ -1,81 +1,78 @@
-
 from __future__ import annotations
+
 import asyncio
 import logging
 
-from app.channels.email import send_email
+from app.channels.whatsapp import send_whatsapp
 from app.core.retry_worker import RetryWorker
 from app.queue.schemas import (
 NotifyPayload,
-EMAIL_PROCESS_QUEUE,
-EMAIL_RETRY_1M,
-EMAIL_RETRY_5M,
-EMAIL_RETRY_30M,
-EMAIL_DLQ,
+WHATSAPP_PROCESS_QUEUE,
+WHATSAPP_RETRY_1M,
+WHATSAPP_RETRY_5M,
+WHATSAPP_RETRY_30M,
+WHATSAPP_DLQ,
 )
 
 logger = logging.getLogger(__name__)
 
+class WhatsAppWorker(RetryWorker):
 
-class EmailWorker(RetryWorker):
 
+  queue_name = WHATSAPP_PROCESS_QUEUE
 
-  queue_name = EMAIL_PROCESS_QUEUE
+  retry_1m_queue = WHATSAPP_RETRY_1M
+  retry_5m_queue = WHATSAPP_RETRY_5M
+  retry_30m_queue = WHATSAPP_RETRY_30M
 
-  retry_1m_queue = EMAIL_RETRY_1M
-  retry_5m_queue = EMAIL_RETRY_5M
-  retry_30m_queue = EMAIL_RETRY_30M
-
-  dlq_queue = EMAIL_DLQ
+  dlq_queue = WHATSAPP_DLQ
 
 # =============================================
 # PARSE MESSAGE
 # =============================================
-
 
   def parse_message(
         self,
         body: str,
     ):
         return NotifyPayload.model_validate_json(body)
+
 # =============================================
 # BUSINESS LOGIC
 # =============================================
+
   async def handle(
     self,
     payload: NotifyPayload,
 ):
 
     logger.info(
-        f"Sending email to "
-        f"{payload.recipient}"
+        f"Sending WhatsApp message "
+        f"to {payload.recipient}"
     )
 
-    await send_email(
+    send_whatsapp(
         to=payload.recipient,
-        subject=payload.subject or "",
         body=payload.body,
-        html_body=payload.html_body,
     )
 
     logger.info(
-        f"Email sent to "
-        f"{payload.recipient}"
+        f"WhatsApp message sent "
+        f"to {payload.recipient}"
     )
 
 async def run():
 
+    worker = WhatsAppWorker()
 
-   worker = EmailWorker()
+    await worker.run()
 
-   await worker.run()
 
 if __name__ == "__main__":
 
-
     logging.basicConfig(
-    level=logging.INFO
-)
+        level=logging.INFO
+    )
 
     asyncio.run(run())
 

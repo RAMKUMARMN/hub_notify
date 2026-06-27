@@ -1,6 +1,6 @@
 import asyncio
 from contextlib import asynccontextmanager
-
+from app.queue.producer import setup_queues
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -13,13 +13,20 @@ from app.workers import (
     rag_worker,
     sms_worker,
 )
+from contextlib import asynccontextmanager
+
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app):
+
+    await setup_queues()
+
     print("Application started")
+
     yield
-    print("Application shutdown")
+
+
 
 
 app = FastAPI(

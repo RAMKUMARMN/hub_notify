@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 from enum import Enum
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -22,6 +23,49 @@ PUSH_FAILED_QUEUE = "push.failed"
 WHATSAPP_PROCESS_QUEUE = "whatsapp.process"
 WHATSAPP_RETRY_QUEUE = "whatsapp.retry"
 WHATSAPP_FAILED_QUEUE = "whatsapp.failed"
+
+
+# EMAIL
+
+EMAIL_PROCESS_QUEUE = "email.process"
+
+EMAIL_RETRY_1M = "email.retry.1m"
+EMAIL_RETRY_5M = "email.retry.5m"
+EMAIL_RETRY_30M = "email.retry.30m"
+
+EMAIL_DLQ = "email.process.dlq"
+
+
+SMS_PROCESS_QUEUE = "sms.process"
+SMS_RETRY_1M = "sms.retry.1m"
+SMS_RETRY_5M = "sms.retry.5m"
+SMS_RETRY_30M = "sms.retry.30m"
+SMS_DLQ = "sms.process.dlq"
+
+
+PUSH_PROCESS_QUEUE = "push.process"
+PUSH_RETRY_1M = "push.retry.1m"
+PUSH_RETRY_5M = "push.retry.5m"
+PUSH_RETRY_30M = "push.retry.30m"
+PUSH_DLQ= "push.process.dlq"
+
+
+
+WHATSAPP_PROCESS_QUEUE = "whatsapp.process"
+WHATSAPP_RETRY_1M = "whatsapp.retry.1m"
+WHATSAPP_RETRY_5M = "whatsapp.retry.5m"
+WHATSAPP_RETRY_30M = "whatsapp.retry.30m"
+WHATSAPP_DLQ= "whatsapp.process.dlq"
+
+FILE_UPLOAD_QUEUE = "file.uploads"
+
+RAG_BULK_INGEST_QUEUE = "rag.bulk_ingest"
+
+EMBEDDING_PROCESS_QUEUE = "embedding.process"
+
+MEMORY_PROCESSING_QUEUE = "memory.processing"
+
+AI_ORCHESTRATION_QUEUE = "ai.orchestration"
 
 
 def _now() -> str:
@@ -63,22 +107,19 @@ QUEUE_FOR_TYPE: dict[str, str] = {
     "bulk_sms": SMS_PROCESS_QUEUE,
     "bulk_push": PUSH_PROCESS_QUEUE,
 
-    # Single notification queues
    
+   
+     "file_upload": FILE_UPLOAD_QUEUE,
 
+    "rag_bulk_ingest": RAG_BULK_INGEST_QUEUE,
+
+    "embedding_process": EMBEDDING_PROCESS_QUEUE,
+
+    "memory_processing": MEMORY_PROCESSING_QUEUE,
+
+    "ai_orchestration": AI_ORCHESTRATION_QUEUE,
     
 
-    # File handling
-    "file_upload": "file.uploads",
-
-    # RAG / ML
-    "rag_bulk_ingest": "rag.bulk_ingest",
-    "embedding_process": "embedding_process",
-    "memory_processing": "memory.processing",
-    "ai_orchestration": "ai_orchestration",
-
-    # Analytics
-    "analytics": "analytics.events",
 }
 # All primary queues. For every queue here, a matching DLQ
 # ("<queue>.dlq") must also be declared — see producer.py.
@@ -86,51 +127,40 @@ ALL_QUEUES = [
 
     # EMAIL
    
-  EMAIL_PROCESS_QUEUE,
-  EMAIL_RETRY_QUEUE,
-  EMAIL_FAILED_QUEUE,
+ EMAIL_PROCESS_QUEUE, 
+
+ EMAIL_DLQ,
    
     # SMS
-  SMS_PROCESS_QUEUE,
-    SMS_RETRY_QUEUE,
-    SMS_FAILED_QUEUE,
+SMS_PROCESS_QUEUE,
+
+SMS_DLQ,
 
     # PUSH
    
-    PUSH_PROCESS_QUEUE,
-    PUSH_RETRY_QUEUE,
-    PUSH_FAILED_QUEUE,
+PUSH_PROCESS_QUEUE,
 
-  
+PUSH_DLQ,
+
     # WHATSAPP
    
-    WHATSAPP_PROCESS_QUEUE,
-    WHATSAPP_RETRY_QUEUE,
-    WHATSAPP_FAILED_QUEUE,
+WHATSAPP_PROCESS_QUEUE,
 
-   
-    # FILES
-   
-    "file.uploads",
-
-  
-    # RAG / ML
-   
-    "rag.bulk_ingest",
-    "embedding_process",
-    "memory.processing",
-    "ai_orchestration",
-
-  
-    # ANALYTICS
-  
-    "analytics.events",
+WHATSAPP_DLQ,
+ 
+FILE_UPLOAD_QUEUE,
+RAG_BULK_INGEST_QUEUE,
+EMBEDDING_PROCESS_QUEUE,
+MEMORY_PROCESSING_QUEUE,
+AI_ORCHESTRATION_QUEUE,
 ]
 
 # Dead-letter queues (DLQs) — messages are routed here automatically
 # after exhausting retries on their primary queue. Declared alongside
 # primary queues so they exist before any consumer starts.
 ALL_DLQS = [f"{q}.dlq" for q in ALL_QUEUES]
+
+
 
 
 class Job(BaseModel):
@@ -169,3 +199,28 @@ class NotifyPayload(BaseModel):
     data: dict | None = None    # for push notification data payload
     attempt: int = 1
     max_attempts: int = 4
+
+
+class FileUploadPayload(BaseModel):
+    document_id: str
+    file_path: str
+    user_id: str
+
+
+class RAGPayload(BaseModel):
+    document_id: str
+    text: str
+
+
+class EmbeddingPayload(BaseModel):
+    document_id: str
+    chunks: list[str]
+
+
+class MemoryPayload(BaseModel):
+    document_id: str
+
+
+class AIOrchestrationPayload(BaseModel):
+    task_type: str
+    payload: dict[str, Any]

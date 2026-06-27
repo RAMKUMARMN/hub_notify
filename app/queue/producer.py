@@ -25,7 +25,8 @@ QUEUE_NAMES: dict[str, str] = {
     "email":     "email.process",
     "sms":       "sms.process",
     "push":      "push.process",
-    "whatsapp":  "whatsapp.process",   
+    "whatsapp":  "whatsapp.process",  
+     
 }
 
 # ── Module-level shared connection / channel ──────────────────────────────────
@@ -55,6 +56,7 @@ async def setup_queues() -> None:
         "sms.process",
         "push.process",
         "whatsapp.process",
+        "file.uploads",
     ]
 
     # -------------------------------------------------
@@ -76,6 +78,20 @@ async def setup_queues() -> None:
             dlq_name,
             durable=True,
         )
+
+        # -------------------------------------------------
+# FILE PROCESS QUEUE
+# -------------------------------------------------
+
+    await _channel.declare_queue(
+    "file.uploads",
+    durable=True,
+)
+
+    await _channel.declare_queue(
+    "file.process.dlq",
+    durable=True,
+)
 
     # -------------------------------------------------
     # EMAIL RETRY QUEUES
@@ -217,6 +233,91 @@ async def setup_queues() -> None:
         "x-dead-letter-routing-key": "whatsapp.process",
     },
 )
+    # -------------------------------------------------
+# FILE RETRY QUEUES
+# -------------------------------------------------
+
+    await _channel.declare_queue(
+    "file.retry.1m",
+    durable=True,
+    arguments={
+        "x-message-ttl": 60000,
+        "x-dead-letter-exchange": "",
+        "x-dead-letter-routing-key": "file.uploads",
+    },
+)
+
+    await _channel.declare_queue(
+    "file.retry.5m",
+    durable=True,
+    arguments={
+        "x-message-ttl": 300000,
+        "x-dead-letter-exchange": "",
+        "x-dead-letter-routing-key": "file.uploads",
+    },
+)
+
+    await _channel.declare_queue(
+    "file.retry.30m",
+    durable=True,
+    arguments={
+        "x-message-ttl": 1800000,
+        "x-dead-letter-exchange": "",
+        "x-dead-letter-routing-key": "file.uploads",
+    },
+)
+    
+
+# DOC EXTRACT
+
+    await _channel.declare_queue(
+    "doc.extract",
+    durable=True,
+)
+
+    await _channel.declare_queue(
+    "doc.extract.dlq",
+    durable=True,
+)
+
+# DOC CHUNK
+
+    await _channel.declare_queue(
+        "doc.chunk",
+    durable=True,
+)
+
+    await _channel.declare_queue(
+    "doc.chunk.dlq",
+    durable=True,
+)
+    
+    # =====================================================
+# EMBEDDING QUEUES
+# =====================================================
+
+    await _channel.declare_queue(
+    "embedding.generate",
+    durable=True,
+)
+
+    await _channel.declare_queue(
+    "embedding.generate.dlq",
+    durable=True,
+)
+    # =========================================================
+# VECTOR QUEUES
+# =========================================================
+
+    await _channel.declare_queue(
+    "vector.index",
+    durable=True,
+)
+
+    await _channel.declare_queue(
+    "vector.index.dlq",
+    durable=True,
+)
     print("RabbitMQ queues initialized")
 
 async def publish(payload: NotifyPayload) -> None:
@@ -279,3 +380,4 @@ async def publish_to_queue(queue_name: str, body: dict) -> None:
     async with connection:
         ch = await connection.channel()
         await ch.default_exchange.publish(message, routing_key=queue_name)
+        

@@ -7,6 +7,23 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+EMAIL_PROCESS_QUEUE = "email.process"
+EMAIL_RETRY_QUEUE = "email.retry"
+EMAIL_FAILED_QUEUE = "email.failed"
+
+
+SMS_PROCESS_QUEUE = "sms.process"
+SMS_RETRY_QUEUE = "sms.retry"
+SMS_FAILED_QUEUE = "sms.failed"
+
+PUSH_PROCESS_QUEUE = "push.process"
+PUSH_RETRY_QUEUE = "push.retry"
+PUSH_FAILED_QUEUE = "push.failed"
+
+WHATSAPP_PROCESS_QUEUE = "whatsapp.process"
+WHATSAPP_RETRY_QUEUE = "whatsapp.retry"
+WHATSAPP_FAILED_QUEUE = "whatsapp.failed"
+
 
 # EMAIL
 
@@ -137,6 +154,11 @@ EMBEDDING_PROCESS_QUEUE,
 MEMORY_PROCESSING_QUEUE,
 AI_ORCHESTRATION_QUEUE,
 ]
+
+# Dead-letter queues (DLQs) — messages are routed here automatically
+# after exhausting retries on their primary queue. Declared alongside
+# primary queues so they exist before any consumer starts.
+ALL_DLQS = [f"{q}.dlq" for q in ALL_QUEUES]
 
 
 

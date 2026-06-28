@@ -280,6 +280,39 @@ async def setup_queues() -> None:
     durable=True,
 )
 
+    # =====================================================
+# DOC EXTRACT RETRY QUEUES
+# =====================================================
+
+    await _channel.declare_queue(
+    "doc.extract.retry.1m",
+    durable=True,
+    arguments={
+        "x-message-ttl": 60000,
+        "x-dead-letter-exchange": "",
+        "x-dead-letter-routing-key": "doc.extract",
+    },
+)
+
+    await _channel.declare_queue(
+    "doc.extract.retry.5m",
+    durable=True,
+    arguments={
+        "x-message-ttl": 300000,
+        "x-dead-letter-exchange": "",
+        "x-dead-letter-routing-key": "doc.extract",
+    },
+)
+
+    await _channel.declare_queue(
+    "doc.extract.retry.30m",
+    durable=True,
+    arguments={
+        "x-message-ttl": 1800000,
+        "x-dead-letter-exchange": "",
+        "x-dead-letter-routing-key": "doc.extract",
+    },
+)
 # DOC CHUNK
 
     await _channel.declare_queue(
@@ -290,8 +323,104 @@ async def setup_queues() -> None:
     await _channel.declare_queue(
     "doc.chunk.dlq",
     durable=True,
+)  
+    await _channel.declare_queue(
+    "doc.chunk.retry.1m",
+    durable=True,
+    arguments={
+        "x-message-ttl": 60000,
+        "x-dead-letter-exchange": "",
+        "x-dead-letter-routing-key": "doc.chunk",
+    },
+)
+
+    await _channel.declare_queue(
+    "doc.chunk.retry.5m",
+    durable=True,
+    arguments={
+        "x-message-ttl": 300000,
+        "x-dead-letter-exchange": "",
+        "x-dead-letter-routing-key": "doc.chunk",
+    },
+)
+
+    await _channel.declare_queue(
+    "doc.chunk.retry.30m",
+    durable=True,
+    arguments={
+        "x-message-ttl": 1800000,
+        "x-dead-letter-exchange": "",
+        "x-dead-letter-routing-key": "doc.chunk",
+    },
 )
     
+    # =====================================================
+# EMBEDDING RETRY QUEUES
+# =====================================================
+
+    await _channel.declare_queue(
+    "embedding.retry.1m",
+    durable=True,
+    arguments={
+        "x-message-ttl": 60000,
+        "x-dead-letter-exchange": "",
+        "x-dead-letter-routing-key": "embedding.generate",
+    },
+)
+
+    await _channel.declare_queue(
+    "embedding.retry.5m",
+    durable=True,
+    arguments={
+        "x-message-ttl": 300000,
+        "x-dead-letter-exchange": "",
+        "x-dead-letter-routing-key": "embedding.generate",
+    },
+)
+
+    await _channel.declare_queue(
+    "embedding.retry.30m",
+    durable=True,
+    arguments={
+        "x-message-ttl": 1800000,
+        "x-dead-letter-exchange": "",
+        "x-dead-letter-routing-key": "embedding.generate",
+    },
+)
+
+# =====================================================
+# VECTOR RETRY QUEUES
+# =====================================================
+
+    await _channel.declare_queue(
+    "vector.retry.1m",
+    durable=True,
+    arguments={
+        "x-message-ttl": 60000,
+        "x-dead-letter-exchange": "",
+        "x-dead-letter-routing-key": "vector.index",
+    },
+)
+
+    await _channel.declare_queue(
+    "vector.retry.5m",
+    durable=True,
+    arguments={
+        "x-message-ttl": 300000,
+        "x-dead-letter-exchange": "",
+        "x-dead-letter-routing-key": "vector.index",
+    },
+)
+
+    await _channel.declare_queue(
+    "vector.retry.30m",
+    durable=True,
+    arguments={
+        "x-message-ttl": 1800000,
+        "x-dead-letter-exchange": "",
+        "x-dead-letter-routing-key": "vector.index",
+    },
+) 
     # =====================================================
 # EMBEDDING QUEUES
 # =====================================================
@@ -316,6 +445,61 @@ async def setup_queues() -> None:
 
     await _channel.declare_queue(
     "vector.index.dlq",
+    durable=True,
+)
+    
+# =========================================================
+# RAG QUEUES
+# =========================================================
+
+    await _channel.declare_queue(
+    "rag.query",
+    durable=True,
+)
+
+    await _channel.declare_queue(
+    "rag.query.dlq",
+    durable=True,
+)
+
+    await _channel.declare_queue(
+    "rag.retrieve",
+    durable=True,
+)
+
+    await _channel.declare_queue(
+    "rag.retrieve.dlq",
+    durable=True,
+)
+    # =========================================================
+# MEMORY QUEUES
+# =========================================================
+
+    await _channel.declare_queue(
+    "memory.process",
+    durable=True,
+)
+
+    await _channel.declare_queue(
+    "memory.process.dlq",
+    durable=True,
+)
+    await _channel.declare_queue(
+    "ai.orchestration",
+    durable=True,
+)
+
+    await _channel.declare_queue(
+    "ai.orchestration.dlq",
+    durable=True,
+)
+    await _channel.declare_queue(
+    "automation.trigger",
+    durable=True,
+)
+
+    await _channel.declare_queue(
+    "automation.trigger.dlq",
     durable=True,
 )
     print("RabbitMQ queues initialized")
@@ -380,4 +564,3 @@ async def publish_to_queue(queue_name: str, body: dict) -> None:
     async with connection:
         ch = await connection.channel()
         await ch.default_exchange.publish(message, routing_key=queue_name)
-        

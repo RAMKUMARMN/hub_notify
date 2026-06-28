@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 
 from app.core.retry_worker import RetryWorker
+from app.services.document_pipeline import index_chunk
 
 from app.queue.schemas import (
     VectorIndexPayload,
@@ -32,9 +34,9 @@ class VectorWorker(RetryWorker):
     # NO RETRIES FOR NOW
     # ==========================================
 
-    retry_1m_queue = None
-    retry_5m_queue = None
-    retry_30m_queue = None
+    retry_1m_queue = "vector.retry.1m"
+    retry_5m_queue = "vector.retry.5m"
+    retry_30m_queue = "vector.retry.30m"
 
     # ==========================================
     # PARSE MESSAGE
@@ -53,38 +55,29 @@ class VectorWorker(RetryWorker):
     # BUSINESS LOGIC
     # ==========================================
 
-    async def handle(
-        self,
-        payload: VectorIndexPayload,
-    ):
+   
+  
+    async def handle(self, payload: VectorIndexPayload):
+        print("\n========== VECTOR WORKER ==========")
+        print("Document ID:", payload.document_id)
+        print("Chunk Index:", payload.chunk_index)
+        print("Filename:", payload.filename)
+        print("Embedding size:", len(payload.embedding))
+        print("===================================")
 
-        logger.info(
-            f"Indexing vector for "
-            f"document={payload.document_id} "
-            f"chunk={payload.chunk_index}"
-        )
+        print("STEP 1: indexing chunk")
 
-        # ======================================
-        # MOCK VECTOR DATABASE INSERT
-        # ======================================
-
-        vector_record = {
-            "document_id": payload.document_id,
-            "chunk_index": payload.chunk_index,
-            "text": payload.chunk_text,
-            "embedding": payload.embedding,
-        }
-
-        # Simulate DB insert
-        print(
-            "\nVECTOR STORED:\n",
-            vector_record,
-        )
-
-        logger.info(
-            "Vector indexing completed successfully"
-        )
-
+        chunk_id = await asyncio.to_thread(
+        index_chunk,
+        filename=payload.filename,
+        chunk_index=payload.chunk_index,
+        chunk_text=payload.chunk_text,
+        embedding=payload.embedding,
+        document_id=payload.document_id,
+    )
+        logger.info(f"Indexed {chunk_id}")
+        print("STEP 2: indexed successfully")
+        print("Stored Chunk ID:", chunk_id)
 
 # ==============================================
 # START WORKER

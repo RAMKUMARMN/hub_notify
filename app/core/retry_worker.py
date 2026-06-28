@@ -51,12 +51,13 @@ class RetryWorker:
     # =====================================================
     # PUBLISH TO QUEUE
     # =====================================================
-
+   
     async def publish_to_queue(
         self,
         queue_name: str,
         payload,
     ):
+        print("PUBLISHING TO:", queue_name)
 
         await self.channel.default_exchange.publish(
 
@@ -89,10 +90,7 @@ class RetryWorker:
 
         except Exception:
 
-            logger.exception(
-                f"Worker failed for "
-                f"{payload.recipient}"
-            )
+            logger.exception(f"Worker failed: {payload}")
 
             payload.attempt += 1
 

@@ -5,6 +5,7 @@ import logging
 
 from app.core.retry_worker import RetryWorker
 from app.queue.producer import publish_to_queue
+from app.services.document_pipeline import encode_text
 
 from app.queue.schemas import (
     EmbeddingPayload,
@@ -35,10 +36,9 @@ class EmbeddingWorker(RetryWorker):
     # NO RETRIES FOR NOW
     # ==========================================
 
-    retry_1m_queue = None
-    retry_5m_queue = None
-    retry_30m_queue = None
-
+    retry_1m_queue = "embedding.retry.1m"
+    retry_5m_queue = "embedding.retry.5m"
+    retry_30m_queue = "embedding.retry.30m"
     # ==========================================
     # PARSE MESSAGE
     # ==========================================
@@ -56,53 +56,30 @@ class EmbeddingWorker(RetryWorker):
     # BUSINESS LOGIC
     # ==========================================
 
-    async def handle(
-        self,
-        payload: EmbeddingPayload,
-    ):
 
-        logger.info(
-            f"Generating embedding for "
-            f"document={payload.document_id} "
-            f"chunk={payload.chunk_index}"
-        )
-
-        # ======================================
-        # TEMPORARY MOCK EMBEDDING
-        # ======================================
-
-        fake_embedding = [
-            0.12,
-            0.45,
-            0.78,
-            0.99,
-        ]
-
-        logger.info(
-            "Embedding generated successfully"
-        )
-
-        # ======================================
-        # SEND TO VECTOR INDEX QUEUE
-        # ======================================
-
-        vector_payload = VectorIndexPayload(
-            document_id=payload.document_id,
-            chunk_index=payload.chunk_index,
-            chunk_text=payload.chunk_text,
-            embedding=fake_embedding,
-        )
-
-        await publish_to_queue(
-            VECTOR_INDEX_QUEUE,
-            vector_payload.model_dump(),
-        )
-
-        logger.info(
-            "Published to vector.index queue"
-        )
-
-
+    async def handle(self, payload: EmbeddingPayload):
+        print("\n========== EMBEDDING WORKER ==========")
+        print("Document ID:", payload.document_id)
+        print("Chunk Index:", payload.chunk_index)
+        print("Filename:", payload.filename)
+        print("Chunk Length:", len(payload.chunk_text))
+        print("======================================")
+    # CPU-heavy — run off the event loop
+        print("STEP 1: generating embedding")
+        embedding = await asyncio.to_thread(encode_text, payload.chunk_text)
+        print("STEP 2: embedding generated")
+        print("Embedding dimensions:", len(embedding))
+        print("STEP 3: publishing vector payload")
+        await publish_to_queue(VECTOR_INDEX_QUEUE, {
+        "document_id": payload.document_id,
+        "chunk_index": payload.chunk_index,
+        "chunk_text": payload.chunk_text,
+        "embedding": embedding,
+        "filename": payload.filename,
+        "user_id": payload.user_id,
+        "total_chunks": payload.total_chunks,
+    })
+        print("STEP 4: vector payload published")
 # ==============================================
 # START WORKER
 # ==============================================

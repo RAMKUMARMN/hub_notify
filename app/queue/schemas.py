@@ -285,84 +285,64 @@ class NotifyPayload(BaseModel):
 # FILE PAYLOAD
 # =========================================================
 
+# Keep existing imports and queue constants unchanged...
+
 class FileUploadPayload(BaseModel):
-
     document_id: str
-
     filename: str
-
     file_type: str
-
     file_size: int
-
     storage_path: str
-
     uploaded_by: str | None = None
-
     attempt: int = 1
+
 
 class ChunkPayload(BaseModel):
-
-
     document_id: str
     text: str
+    user_id: str | None = None
+    filename: str | None = None
     attempt: int = 1
 
-class EmbeddingPayload(BaseModel):
 
+class EmbeddingPayload(BaseModel):
     document_id: str
-
     chunk_index: int
-
     chunk_text: str
-
+    user_id: str | None = None
+    filename: str | None = None
+    total_chunks: int = 1
     attempt: int = 1
-class EmbeddingPayload(BaseModel):
 
-
-   document_id: str
-
-   chunk_index: int
-
-   chunk_text: str
-
-   attempt: int = 1
-
-# =========================================================
-
-# EMBEDDING PAYLOAD
-
-# =========================================================
-
-class EmbeddingPayload(BaseModel):
-
-   document_id: str
-
-   chunk_index: int
-
-   chunk_text: str
-
-   attempt: int = 1
-
-# =========================================================
-
-# VECTOR INDEX PAYLOAD
-
-# =========================================================
 
 class VectorIndexPayload(BaseModel):
-
-   document_id: str
-
-   chunk_index: int
-
-   chunk_text: str
-
-   embedding: list[float]
-
-   attempt: int = 1
+    document_id: str
+    chunk_index: int
+    chunk_text: str
+    embedding: list[float]
+    user_id: str | None = None
+    filename: str | None = None
+    total_chunks: int = 1
+    attempt: int = 1
 
 
+class DocumentMemoryPayload(BaseModel):
+    document_id: str
+    user_id: str
+    chunk_index: int
+    chunk_text: str
+    filename: str | None = None
+    total_chunks: int = 1
+    attempt: int = 1
+# =========================================================
+# RAG PAYLOADS
+# =========================================================
+
+class RAGQueryPayload(BaseModel):
+
+    query: str
+
+    attempt: int = 1
 
 
 class AIOrchestrationPayload(BaseModel):

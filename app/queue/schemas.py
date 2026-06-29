@@ -57,15 +57,79 @@ WHATSAPP_RETRY_5M = "whatsapp.retry.5m"
 WHATSAPP_RETRY_30M = "whatsapp.retry.30m"
 WHATSAPP_DLQ= "whatsapp.process.dlq"
 
+# =========================================================
+# FILE PIPELINE
+# =========================================================
+
+
 FILE_UPLOAD_QUEUE = "file.uploads"
 
-RAG_BULK_INGEST_QUEUE = "rag.bulk_ingest"
+FILE_RETRY_1M = "file.retry.1m"
+FILE_RETRY_5M = "file.retry.5m"
+FILE_RETRY_30M = "file.retry.30m"
 
-EMBEDDING_PROCESS_QUEUE = "embedding.process"
+FILE_UPLOAD_DLQ = "file.uploads.dlq"
 
-MEMORY_PROCESSING_QUEUE = "memory.processing"
+# =========================================================
+# DOCUMENT PIPELINE
+# =========================================================
+
+DOC_EXTRACT_QUEUE = "doc.extract"
+DOC_EXTRACT_DLQ = "doc.extract.dlq"
+
+DOC_CHUNK_QUEUE = "doc.chunk"
+DOC_CHUNK_DLQ = "doc.chunk.dlq"
+
+EMBEDDING_QUEUE = "embedding.generate"
+EMBEDDING_DLQ = "embedding.generate.dlq"
+
+VECTOR_INDEX_QUEUE = "vector.index"
+VECTOR_INDEX_DLQ = "vector.index.dlq"
+
+# =========================================================
+# RAG PIPELINE
+# =========================================================
+
+RAG_QUERY_QUEUE = "rag.query"
+RAG_QUERY_DLQ = "rag.query.dlq"
+
+RAG_RETRIEVAL_QUEUE = "rag.retrieve"
+RAG_RETRIEVAL_DLQ = "rag.retrieve.dlq"
+
+# =========================================================
+# MEMORY PIPELINE
+# =========================================================
+
+MEMORY_PROCESS_QUEUE = "memory.process"
+MEMORY_PROCESS_DLQ = "memory.process.dlq"
+
+MEMORY_SUMMARY_QUEUE = "memory.summary"
+MEMORY_SUMMARY_DLQ = "memory.summary.dlq"
+
+# =========================================================
+# AI ORCHESTRATION
+# =========================================================
 
 AI_ORCHESTRATION_QUEUE = "ai.orchestration"
+AI_ORCHESTRATION_DLQ = "ai.orchestration.dlq"
+
+MODEL_ROUTER_QUEUE = "model.router"
+MODEL_ROUTER_DLQ = "model.router.dlq"
+
+# =========================================================
+# ANALYTICS
+# =========================================================
+
+ANALYTICS_EVENTS_QUEUE = "analytics.events"
+ANALYTICS_EVENTS_DLQ = "analytics.events.dlq"
+
+# =========================================================
+# AUTOMATION / WORKFLOW
+# =========================================================
+
+AUTOMATION_TRIGGER_QUEUE = "automation.trigger"
+AUTOMATION_TRIGGER_DLQ = "automation.trigger.dlq"
+
 
 
 def _now() -> str:
@@ -109,15 +173,6 @@ QUEUE_FOR_TYPE: dict[str, str] = {
 
    
    
-     "file_upload": FILE_UPLOAD_QUEUE,
-
-    "rag_bulk_ingest": RAG_BULK_INGEST_QUEUE,
-
-    "embedding_process": EMBEDDING_PROCESS_QUEUE,
-
-    "memory_processing": MEMORY_PROCESSING_QUEUE,
-
-    "ai_orchestration": AI_ORCHESTRATION_QUEUE,
     
 
 }
@@ -148,11 +203,37 @@ WHATSAPP_PROCESS_QUEUE,
 
 WHATSAPP_DLQ,
  
-FILE_UPLOAD_QUEUE,
-RAG_BULK_INGEST_QUEUE,
-EMBEDDING_PROCESS_QUEUE,
-MEMORY_PROCESSING_QUEUE,
-AI_ORCHESTRATION_QUEUE,
+
+    # FILE
+    FILE_UPLOAD_QUEUE,
+FILE_RETRY_1M,
+FILE_RETRY_5M,
+FILE_RETRY_30M,
+FILE_UPLOAD_DLQ ,
+
+    # DOC
+    DOC_EXTRACT_QUEUE,
+    DOC_CHUNK_QUEUE,
+    EMBEDDING_QUEUE,
+    VECTOR_INDEX_QUEUE,
+
+    # RAG
+    RAG_QUERY_QUEUE,
+    RAG_RETRIEVAL_QUEUE,
+
+    # MEMORY
+    MEMORY_PROCESS_QUEUE,
+    MEMORY_SUMMARY_QUEUE,
+
+    # AI
+    AI_ORCHESTRATION_QUEUE,
+    MODEL_ROUTER_QUEUE,
+
+    # ANALYTICS
+    ANALYTICS_EVENTS_QUEUE,
+
+    # AUTOMATION
+    AUTOMATION_TRIGGER_QUEUE,
 ]
 
 # Dead-letter queues (DLQs) — messages are routed here automatically
@@ -200,25 +281,68 @@ class NotifyPayload(BaseModel):
     attempt: int = 1
     max_attempts: int = 4
 
+# =========================================================
+# FILE PAYLOAD
+# =========================================================
+
+# Keep existing imports and queue constants unchanged...
 
 class FileUploadPayload(BaseModel):
     document_id: str
-    file_path: str
-    user_id: str
+    filename: str
+    file_type: str
+    file_size: int
+    storage_path: str
+    uploaded_by: str | None = None
+    attempt: int = 1
 
 
-class RAGPayload(BaseModel):
+class ChunkPayload(BaseModel):
     document_id: str
     text: str
+    user_id: str | None = None
+    filename: str | None = None
+    attempt: int = 1
 
 
 class EmbeddingPayload(BaseModel):
     document_id: str
-    chunks: list[str]
+    chunk_index: int
+    chunk_text: str
+    user_id: str | None = None
+    filename: str | None = None
+    total_chunks: int = 1
+    attempt: int = 1
 
 
-class MemoryPayload(BaseModel):
+class VectorIndexPayload(BaseModel):
     document_id: str
+    chunk_index: int
+    chunk_text: str
+    embedding: list[float]
+    user_id: str | None = None
+    filename: str | None = None
+    total_chunks: int = 1
+    attempt: int = 1
+
+
+class DocumentMemoryPayload(BaseModel):
+    document_id: str
+    user_id: str
+    chunk_index: int
+    chunk_text: str
+    filename: str | None = None
+    total_chunks: int = 1
+    attempt: int = 1
+# =========================================================
+# RAG PAYLOADS
+# =========================================================
+
+class RAGQueryPayload(BaseModel):
+
+    query: str
+
+    attempt: int = 1
 
 
 class AIOrchestrationPayload(BaseModel):

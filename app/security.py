@@ -1,24 +1,36 @@
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Query
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from app.config import settings
 
 # HTTPBearer extracts the "Authorization: Bearer <token>" header
-security_scheme = HTTPBearer(auto_error=True)
+security_scheme = HTTPBearer(auto_error=False)
 
 
 async def verify_jwt_token(
-    credentials: HTTPAuthorizationCredentials = Depends(security_scheme),
+    credentials: HTTPAuthorizationCredentials | None = Depends(security_scheme),
+    token: str | None = Query(None),
 ) -> dict:
     """
     Decrypt and verify the incoming HS256 JWT token
-    from the Authorization header.
+    from either the Authorization header or the token query parameter.
     """
-    token = credentials.credentials
+    actual_token = None
+    if credentials:
+        actual_token = credentials.credentials
+    elif token:
+        actual_token = token
+
+    if not actual_token:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authenticated",
+        )
+
     try:
         payload = jwt.decode(
-            token,
+            actual_token,
             settings.jwt_secret_key,
             algorithms=[settings.jwt_algorithm],
         )

@@ -7,7 +7,7 @@ Apply the [general coding guidelines](./general-coding.instructions.md) to all c
 
 ## Agent & Prompt Guidelines
 - Six single-task agents in `.github/agents/` with `.agent.md` extension:
-  - `notify agent.agent.md` — coordinator (routes to single-task agents)
+  - `notify-agent.agent.md` — coordinator (routes to single-task agents)
   - `notify-channel.agent.md` — create/update notification channel modules (Email, SMS, Push, WhatsApp)
   - `notify-queue.agent.md` — configure/inspect RabbitMQ queues and retry routing
   - `notify-api.agent.md` — create/update FastAPI REST endpoints

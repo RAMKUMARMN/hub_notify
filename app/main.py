@@ -14,6 +14,7 @@ from app.workers import (
     file_worker,
     rag_worker,
     sms_worker,
+    whatsapp_worker,
 )
 
 
@@ -34,6 +35,7 @@ async def lifespan(app: FastAPI):
         rag_worker.run,
         email_worker.run,
         sms_worker.run,
+        whatsapp_worker.run,
         analytics_worker.run,
     ]
     tasks = [asyncio.create_task(w()) for w in workers]
@@ -74,6 +76,9 @@ app.add_middleware(
 
 @app.middleware("http")
 async def log_request_body(request: Request, call_next):
+    if request.method == "GET" or request.url.path.endswith("/stream"):
+        return await call_next(request)
+
     body = await request.body()
     path = request.url.path
     method = request.method

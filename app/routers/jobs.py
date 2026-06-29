@@ -25,6 +25,7 @@ from app.workers import (
     file_worker,
     rag_worker,
     sms_worker,
+    whatsapp_worker,
 )
 from app.security import verify_jwt_token
 
@@ -39,6 +40,7 @@ _WORKER_MAP = {
     JobType.RAG_BULK_INGEST: rag_worker.enqueue,
     JobType.BULK_EMAIL:     email_worker.enqueue,
     JobType.BULK_SMS:       sms_worker.enqueue,
+    JobType.BULK_WHATSAPP:  whatsapp_worker.enqueue,
     JobType.ANALYTICS:      analytics_worker.enqueue,
 }
 

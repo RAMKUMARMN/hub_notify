@@ -308,7 +308,7 @@ async def run_consumer() -> None:
             await queue.consume(process_priority_message)
 
         # 4. Declare channel-specific process, failed, and retry queues
-        for base in ["email", "sms", "push"]:
+        for base in ["email", "sms", "push", "whatsapp"]:
             process_q_name = f"{base}.process"
             failed_q_name = f"{base}.failed"
 

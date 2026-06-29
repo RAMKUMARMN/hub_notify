@@ -15,7 +15,7 @@ QUEUE_NAMES = {
     "email": "email.process",
     "sms": "sms.process",
     "push": "push.process",
-    "whatsapp": "push.process",  # shares push queue for now
+    "whatsapp": "whatsapp.process",
 }
 
 

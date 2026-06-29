@@ -74,6 +74,9 @@ app.add_middleware(
 
 @app.middleware("http")
 async def log_request_body(request: Request, call_next):
+    if request.method == "GET" or request.url.path.endswith("/stream"):
+        return await call_next(request)
+
     body = await request.body()
     path = request.url.path
     method = request.method

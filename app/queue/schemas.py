@@ -16,6 +16,7 @@ class JobType(str, Enum):
     RAG_BULK_INGEST = "rag_bulk_ingest"
     BULK_EMAIL = "bulk_email"
     BULK_SMS = "bulk_sms"
+    BULK_WHATSAPP = "bulk_whatsapp"
     ANALYTICS = "analytics"
 
 
@@ -31,6 +32,7 @@ QUEUE_FOR_TYPE: dict[str, str] = {
     "rag_bulk_ingest": "rag.bulk_ingest",
     "bulk_email":      "notify.bulk_email",
     "bulk_sms":        "notify.bulk_sms",
+    "bulk_whatsapp":   "notify.bulk_whatsapp",
     "analytics":       "analytics.events",
     "email":           "email.process",
     "sms":             "sms.process",
@@ -42,6 +44,7 @@ ALL_QUEUES = [
     "rag.bulk_ingest",
     "notify.bulk_email",
     "notify.bulk_sms",
+    "notify.bulk_whatsapp",
     "analytics.events",
     "email.process",
     "sms.process",

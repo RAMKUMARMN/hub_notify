@@ -5,4 +5,5 @@ from app.workers import (  # noqa: F401
     file_worker,
     rag_worker,
     sms_worker,
+    whatsapp_worker,
 )

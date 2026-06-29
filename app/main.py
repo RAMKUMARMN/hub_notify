@@ -14,6 +14,7 @@ from app.workers import (
     file_worker,
     rag_worker,
     sms_worker,
+    whatsapp_worker,
 )
 
 
@@ -34,6 +35,7 @@ async def lifespan(app: FastAPI):
         rag_worker.run,
         email_worker.run,
         sms_worker.run,
+        whatsapp_worker.run,
         analytics_worker.run,
     ]
     tasks = [asyncio.create_task(w()) for w in workers]

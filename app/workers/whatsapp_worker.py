@@ -1,0 +1,86 @@
+"""
+Bulk WhatsApp worker — dispatches WhatsApp messages to a large list of recipients
+(stubbed locally — no real Twilio credentials required for demo).
+
+Queue: notify.bulk_whatsapp
+"""
+from __future__ import annotations
+
+import asyncio
+import logging
+import random
+
+from app.queue.job_store import job_store
+from app.queue.schemas import Job, JobStatus
+
+logger = logging.getLogger(__name__)
+
+_queue: asyncio.Queue[Job] = asyncio.Queue()
+
+
+def enqueue(job: Job) -> None:
+    _queue.put_nowait(job)
+
+
+async def _process(job: Job) -> None:
+    recipients: list[str] = job.payload.get("recipients", [])
+
+    if not recipients:
+        n = job.payload.get("count", random.randint(20, 200))
+        recipients = [f"whatsapp:+6091234{str(i).zfill(4)}" for i in range(n)]
+
+    total = len(recipients)
+    job.total = total
+
+    await job_store.update(
+        job.job_id,
+        JobStatus.PROCESSING,
+        progress=0,
+        message=f"Queuing {total} WhatsApp messages via Twilio…",
+        done_count=0,
+    )
+    await asyncio.sleep(0.2)
+
+    sent = 0
+    failed = 0
+    for i, phone in enumerate(recipients):
+        # Simulate 1% failure rate for realism
+        if random.random() < 0.01:
+            failed += 1
+        sent += 1
+        pct = int((sent / total) * 100)
+        if sent % max(1, total // 8) == 0 or sent == total:
+            msg = (
+                f"Dispatched {sent}/{total} WhatsApp messages"
+                f"{f' ({failed} failed)' if failed else ''}…"
+            )
+            await job_store.update(
+                job.job_id,
+                JobStatus.PROCESSING,
+                progress=pct,
+                message=msg,
+                done_count=sent,
+            )
+        await asyncio.sleep(random.uniform(0.01, 0.05))
+
+    await job_store.update(
+        job.job_id,
+        JobStatus.DONE,
+        progress=100,
+        message=f"✓ {sent - failed}/{total} delivered · {failed} failed",
+        done_count=sent,
+    )
+
+
+async def run() -> None:
+    logger.info("notify.bulk_whatsapp worker started")
+    while True:
+        job = await _queue.get()
+        try:
+            await _process(job)
+        except Exception as exc:
+            logger.exception("whatsapp_worker error for job %s", job.job_id)
+            await job_store.update(job.job_id, JobStatus.FAILED,
+                                   progress=job.progress, message=str(exc))
+        finally:
+            _queue.task_done()

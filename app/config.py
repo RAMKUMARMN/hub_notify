@@ -24,10 +24,10 @@ class Settings(BaseSettings):
     twilio_phone_number: str = ""
     twilio_whatsapp_number: str = "whatsapp:+14155238886"
 
-    # Firebase (Push — Android)
+    # Firebase (Push â€” Android)
     firebase_service_account_json: str = ""  # base64-encoded JSON
 
-    # AWS SNS (Push — iOS APNs)
+    # AWS SNS (Push â€” iOS APNs)
     aws_access_key_id: str = ""
     aws_secret_access_key: str = ""
     aws_region: str = "ap-south-1"

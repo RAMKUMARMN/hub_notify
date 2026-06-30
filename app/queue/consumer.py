@@ -19,6 +19,14 @@ from app.config import settings
 from app.queue.producer import publish
 from app.queue.schemas import NotifyPayload
 
+# Configure logging at import time so log output appears regardless of
+# whether this module is run directly (`python -m app.queue.consumer`)
+# or imported and started as a background task inside uvicorn (main.py's
+# lifespan). Previously this was only called inside `if __name__ == "__main__"`,
+# which meant the embedded consumer (started via import) had no logging
+# handler/level configured and silently dropped all INFO-level logs.
+logging.basicConfig(level=logging.INFO)
+
 logger = logging.getLogger(__name__)
 
 RETRY_DELAYS = {1: 0, 2: 60, 3: 300, 4: 1800}  # seconds before retry
@@ -35,16 +43,18 @@ async def dispatch(payload: NotifyPayload) -> None:
                 html_body=payload.html_body,
             )
         case "sms":
-            send_sms(to=payload.recipient, body=payload.body)
+            # Made this awaitable if send_sms is an async function in your project
+            await send_sms(to=payload.recipient, body=payload.body)
         case "push":
-            send_push(
+            # Triggers your Firebase delivery logic using the saved FCM tokens!
+            await send_push(
                 device_token=payload.recipient,
                 title=payload.title or "CixioHub",
                 body=payload.body,
                 data=payload.data,
             )
         case "whatsapp":
-            send_whatsapp(to=payload.recipient, body=payload.body)
+            await send_whatsapp(to=payload.recipient, body=payload.body)
         case _:
             raise ValueError(f"Unknown channel: {payload.channel}")
 
@@ -59,8 +69,14 @@ async def process_message(message: aio_pika.IncomingMessage) -> None:
         except Exception as exc:
             logger.warning("Failed attempt %d for job %s: %s", payload.attempt, payload.job_id, exc)
             if payload.attempt < payload.max_attempts:
+                # Get the targeted delay period from the mapping dictionary
+                delay_seconds = RETRY_DELAYS.get(payload.attempt, 0)
+
+                if delay_seconds > 0:
+                    logger.info("Waiting %d seconds before re-queuing job %s...", delay_seconds, payload.job_id)
+                    await asyncio.sleep(delay_seconds)
+
                 # Re-enqueue with incremented attempt count
-                # TODO: add delay (publish after RETRY_DELAYS[payload.attempt] seconds)
                 payload.attempt += 1
                 await publish(payload)
             else:
@@ -75,7 +91,8 @@ async def run_consumer() -> None:
         channel = await connection.channel()
         await channel.set_qos(prefetch_count=10)
 
-        for queue_name in ["email.process", "sms.process", "push.process"]:
+        # Added whatsapp.process here so it matches the channel dispatch cases
+        for queue_name in ["email.process", "sms.process", "push.process", "whatsapp.process"]:
             queue = await channel.declare_queue(queue_name, durable=True)
             await queue.consume(process_message)
 
@@ -84,5 +101,4 @@ async def run_consumer() -> None:
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
     asyncio.run(run_consumer())
